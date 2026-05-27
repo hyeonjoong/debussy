@@ -1,0 +1,94 @@
+[build-system]
+requires = ["setuptools>=64", "setuptools_scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "debussy-audio"
+version = "0.1.0"
+description = "11-parameter acoustic reporting toolbox for autonomic-arousal stimulus preparation."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+authors = [
+  {name = "Hyeon-Joong Kim", email = "hyeonjoong.kim@belltherapeutics.com"},
+]
+maintainers = [
+  {name = "Hyeon-Joong Kim", email = "hyeonjoong.kim@belltherapeutics.com"},
+]
+keywords = [
+  "audio analysis",
+  "psychoacoustics",
+  "music information retrieval",
+  "autonomic arousal",
+  "stimulus preparation",
+  "librosa",
+  "mosqito",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Multimedia :: Sound/Audio :: Analysis",
+  "Topic :: Scientific/Engineering",
+]
+dependencies = [
+  "librosa>=0.10.0",
+  "mosqito>=1.0.0",
+  "soundfile>=0.12.0",
+  "numpy>=1.24.0",
+  "scipy>=1.10.0",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=7.0",
+  "pytest-cov>=4.0",
+]
+plot = [
+  "matplotlib>=3.7.0",
+]
+demo = [
+  "gradio>=5.0.0",
+  "matplotlib>=3.7.0",
+]
+dev = [
+  "debussy-audio[test,plot]",
+  "ruff>=0.4.0",
+  "mkdocs-material>=9.5.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/jjjooong/debussy"
+Documentation = "https://github.com/jjjooong/debussy#readme"
+Repository = "https://github.com/jjjooong/debussy"
+Issues = "https://github.com/jjjooong/debussy/issues"
+"HuggingFace Demo" = "https://huggingface.co/spaces/jjjooong/debussy"
+
+[project.scripts]
+debussy = "debussy._core:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+debussy = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+filterwarnings = [
+  "ignore::DeprecationWarning",
+  "ignore::PendingDeprecationWarning",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501"]
