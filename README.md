@@ -147,4 +147,3 @@ MIT. See [LICENSE](LICENSE).
 
 DEBUSSY builds directly on [librosa](https://librosa.org/) and
 [MOSQITO](https://mosqito.readthedocs.io/). We are grateful to both communities.
-
