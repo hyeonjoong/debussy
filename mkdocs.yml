@@ -1,0 +1,20 @@
+site_name: DEBUSSY
+site_url: https://jjjooong.github.io/debussy
+repo_url: https://github.com/jjjooong/debussy
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - content.code.copy
+plugins:
+  - search
+nav:
+  - Home: index.md
+  - Quickstart: quickstart.md
+  - API:
+    - api/index.md
+  - Validation: validation.md
+  - Reference ranges: reference_ranges.md
+  - FAQ: faq.md
+  - Troubleshooting: troubleshooting.md
+  - Changelog: changelog.md
