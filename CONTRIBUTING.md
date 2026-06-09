@@ -5,7 +5,7 @@ feature requests, documentation improvements, and code contributions.
 
 ## Reporting issues
 
-- Search [existing issues](https://github.com/jjjooong/debussy/issues) before
+- Search [existing issues](https://github.com/hyeonjoong/debussy/issues) before
   filing a new one.
 - For bugs, include: Python version, OS, DEBUSSY version (`debussy.__version__`),
   a minimal reproducer (audio snippet if relevant), expected vs actual output.
@@ -15,7 +15,7 @@ feature requests, documentation improvements, and code contributions.
 ## Development setup
 
 ```bash
-git clone https://github.com/jjjooong/debussy.git
+git clone https://github.com/hyeonjoong/debussy.git
 cd debussy
 pip install -e ".[dev]"
 pytest

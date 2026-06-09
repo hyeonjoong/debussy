@@ -1,12 +1,12 @@
 # DEBUSSY
 
-[![CI](https://github.com/jjjooong/debussy/actions/workflows/tests.yml/badge.svg)](https://github.com/jjjooong/debussy/actions/workflows/tests.yml)
+[![CI](https://github.com/hyeonjoong/debussy/actions/workflows/tests.yml/badge.svg)](https://github.com/hyeonjoong/debussy/actions/workflows/tests.yml)
 [![PyPI version](https://img.shields.io/pypi/v/debussy-audio.svg)](https://pypi.org/project/debussy-audio/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![HuggingFace Demo](https://img.shields.io/badge/🤗-Try%20on%20HF%20Spaces-yellow)](https://huggingface.co/spaces/jjjooong/debussy)
 
-> **DEBUSSY** is a Python toolbox that computes a fixed set of **eleven acoustic
+> **DEBUSSY** is a Python toolbox that computes a fixed set of **twelve acoustic
 > reporting parameters** from an audio stimulus, in a single call, with output
 > formats designed for **reproducible psychophysiology and autonomic-arousal
 > research**.
@@ -26,8 +26,8 @@ detector, mosqito version).
 
 DEBUSSY closes this gap with three design choices:
 
-1. **One call, eleven parameters, one schema.** A single `analyze_audio()`
-   returns a dataclass with the eleven parameters in the order and units of the
+1. **One call, twelve parameters, one schema.** A single `analyze_audio()`
+   returns a dataclass with the twelve parameters in the order and units of the
    reporting table used in our companion review paper.
 2. **Standardised internals.** Window lengths, A-weighting filter coefficients,
    and the spectral-slope band are fixed and documented.
@@ -35,7 +35,7 @@ DEBUSSY closes this gap with three design choices:
    with a tier indicating whether it is a universal design check, a directional
    guideline, or an exploratory descriptor.
 
-## The eleven parameters
+## The twelve parameters
 
 | # | Parameter | Unit | Family |
 |---|---|---|---|
@@ -60,7 +60,7 @@ pip install debussy-audio
 To install from source:
 
 ```bash
-git clone https://github.com/jjjooong/debussy.git
+git clone https://github.com/hyeonjoong/debussy.git
 cd debussy
 pip install -e .
 ```
@@ -97,7 +97,7 @@ DEBUSSY has been validated on a **60-track open-dataset + clinical benchmark**:
 - **B2 (FMA medium)** *n*=15 (genre-stratified)
 - **C1 (BELL-001 SleepThera)** *n*=20 (breath-paced biofeedback stimuli)
 
-All sixty tracks produce eleven non-null parameters within physiologically
+All sixty tracks produce twelve non-null parameters within physiologically
 plausible ranges. See `paper/` for the JOSS methods paper, including
 distribution figures and effect-size analysis.
 
@@ -110,7 +110,7 @@ If you use DEBUSSY in your research, please cite:
 
 ```bibtex
 @article{Kim2026,
-  title   = {DEBUSSY: A Python toolbox for 11-parameter acoustic reporting of audio stimuli used in autonomic-arousal research},
+  title   = {DEBUSSY: A Python toolbox for 12-parameter acoustic reporting of audio stimuli used in autonomic-arousal research},
   author  = {Kim, Hyeon-Joong and others},
   year    = {2026},
   journal = {Journal of Open Source Software},
