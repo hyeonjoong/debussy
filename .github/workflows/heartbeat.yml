@@ -1,0 +1,41 @@
+name: commit-heartbeat
+
+# Laptop-independent dead-man's switch for the JOSS 6-month activity history.
+# The local launchd auto-commit can silently die (machine asleep, macOS TCC
+# blocking log files, a moved script — all observed in practice). This workflow
+# runs on GitHub's own infrastructure, so it keeps watching even when the laptop
+# is off: if no commit has landed in the last STALE_DAYS days it fails the run,
+# and GitHub emails the repository owner. It never commits anything itself —
+# self-committing would mask a dead local automation.
+
+on:
+  schedule:
+    - cron: "0 2 * * *"   # 02:00 UTC daily (~11:00 KST)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    env:
+      STALE_DAYS: "4"     # commits are scheduled Tue+Fri, so >4 days = a miss
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fail (and email owner) if no recent commit
+        run: |
+          last=$(git log -1 --format=%ct)
+          now=$(date +%s)
+          age_days=$(( (now - last) / 86400 ))
+          echo "Last commit: $(git log -1 --format='%ci  %s')"
+          echo "Age: ${age_days} day(s); threshold: ${STALE_DAYS} day(s)."
+          if [ "$age_days" -gt "${STALE_DAYS}" ]; then
+            echo "::error::DEBUSSY commit history has stalled (${age_days} days since the last commit). The local auto-commit automation may be dead — check launchctl list | grep debussy and ~/Library/Logs/debussy/."
+            exit 1
+          fi
+          echo "OK — commit history is active."
