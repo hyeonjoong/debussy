@@ -80,10 +80,45 @@ def test_tier1_statuses_are_valid(sine_440, rough_burst):
             assert it["status"] in _T1_STATUSES
 
 
+def test_sharp_onset_share_never_hard_fails(sine_440, rough_burst):
+    """The attack Tier-1 check may FAIL only on the paper's median rule, never
+    purely because some onsets are sharp (envelope rise ≠ validated startle)."""
+    for path in (sine_440, rough_burst):
+        r = analyze_audio(path)
+        item = [it for it in tier1_items(r) if "Attack" in it["parameter"]][0]
+        if item["status"] == "FAIL":
+            assert r.attack_median_ms is not None and r.attack_median_ms <= 50.0
+
+
+def test_streamed_level_matches_whole_file(tmp_path_factory):
+    """Whole-file-streamed level metrics (used for long files) must equal the
+    direct whole-file computation — otherwise a long file would report a
+    different LAeq / dynamic range than the same audio analysed short."""
+    from debussy._core import (
+        _stream_level_metrics, laeq_dbfs, dynamic_range_db,
+    )
+    t = np.arange(int(FS * 8)) / FS
+    rng = np.random.RandomState(3)
+    y = 0.2 * np.sin(2 * np.pi * 200 * t) + 0.05 * rng.standard_normal(len(t))
+    y[int(3 * FS):int(5 * FS)] *= 4.0  # a louder section to widen dynamic range
+    y = np.clip(y, -1, 1)
+    path = os.path.join(tmp_path_factory.mktemp("lvl"), "lvl.wav")
+    sf.write(path, y, FS, subtype="PCM_16")
+
+    yf, _ = sf.read(path, always_2d=False)
+    s = _stream_level_metrics(path)
+    assert abs(s["laeq_dbfs_a"] - laeq_dbfs(yf, FS)) < 0.05
+    assert abs(s["dynamic_range_db"] - dynamic_range_db(yf, FS)) < 0.6
+
+
 @pytest.mark.slow
 def test_long_file_uses_probe_based_analysis(long_file):
     r = analyze_audio(long_file)
+    assert r.analysis_mode == "probe"
     assert "probe-based" in (r.notes or "")
     assert abs(r.duration_s - 95.0) < 1.0          # true full duration preserved
     assert r.laeq_dbfs_a is not None                # headline params still produced
     assert r.spectral_centroid_hz is not None
+    # A sample must never certify a long file as clean.
+    rough = [it for it in tier1_items(r) if it["parameter"] == "Roughness"][0]
+    assert rough["status"] != "PASS"

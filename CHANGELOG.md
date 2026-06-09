@@ -8,20 +8,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Temporal coverage descriptors** (`Result.roughness_coverage_pct`,
-  `Result.sharp_onset_pct`) and `coverage_items()` / `plot_coverage()`: the
-  proportion of a stimulus that crosses each Tier-1 threshold, so a long clip
-  that is calm on average no longer hides brief harsh passages. Additive —
-  the twelve headline parameters and their validated values are unchanged.
-- **Coverage-gated Tier-1** roughness and attack checks: a brief excursion is
-  tolerated (`PASS`), an intermittent one is downgraded (new `CAUTION` status),
-  a frequent one fails — judging *how much* of the stimulus violates a
-  threshold rather than the whole-file mean alone.
-- **Length-aware analysis of long files**: recordings longer than 90 s are
-  characterised from evenly spaced short probes spanning the whole file
-  (bounded memory and runtime), instead of imposing a duration limit, so
-  long-form ambient/sleep stimuli are supported. Short files — including every
-  validation-benchmark track — are still analysed in full, byte for byte.
+- **Temporal-coverage descriptors** (`Result.roughness_coverage_pct`,
+  `Result.sharp_onset_pct`, `Result.sharp_onset_count`) and `coverage_items()` /
+  `plot_coverage()`: the proportion of a stimulus that crosses each Tier-1
+  threshold, so a long clip that is calm on average no longer hides brief harsh
+  passages. Additive — the twelve headline parameters and their validated
+  values are unchanged (regression-locked against golden values on short files).
+- **Conservative coverage-gated Tier-1 roughness**: the status is the *more
+  severe* of the paper's whole-file 0.3 asper check and the proportion of time
+  above 0.3 asper (new `CAUTION` status for intermittent roughness). Coverage
+  can only make a verdict more conservative, never rescue a high mean. The
+  per-frame threshold and the 2 %/10 % bands are documented as provisional
+  screening heuristics, not validated cut-offs.
+- **Length-aware analysis of long files** (`Result.analysis_mode`): recordings
+  longer than 90 s are characterised from evenly spaced short probes spanning
+  the whole file (bounded memory/runtime) rather than via a duration limit, so
+  long-form ambient/sleep stimuli are supported. Level metrics (LAeq, dynamic
+  range, crest) are computed *exactly* over the whole file by streaming — they
+  are not estimated from probes. Coverage on long files is a **sample**, so a
+  "clean" roughness reading is **never certified** (capped at `CAUTION`). Short
+  files — including every validation-benchmark track — are still analysed in
+  full, byte for byte.
+
+### Changed
+- Sharp-onset share is now an **annotation**, not a hard fail: librosa onset +
+  10–90 % rise is an envelope descriptor, not a validated startle metric (it
+  ignores absolute level), so it can only downgrade an otherwise-passing attack
+  check to `CAUTION` (and only when both substantial and non-incidental,
+  `n ≥ 5`). The Tier-1 attack verdict remains the paper's median-onset rule.
 
 ### Fixed
 - Corrected `Homepage`/`Repository`/`Issues`/CI/clone URLs to the actual

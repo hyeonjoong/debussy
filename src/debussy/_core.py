@@ -128,17 +128,22 @@ def attack_times_ms(y: np.ndarray, fs: int, librosa) -> dict:
 
     if not attacks:
         return {"n_onsets": int(len(onsets)), "mean_ms": None,
-                "median_ms": None, "sd_ms": None, "frac_below_50ms": None}
+                "median_ms": None, "sd_ms": None,
+                "frac_below_50ms": None, "n_below_50ms": 0}
     arr = np.array(attacks)
     return {
         "n_onsets": int(len(onsets)),
         "mean_ms": float(np.mean(arr)),
         "median_ms": float(np.median(arr)),
         "sd_ms": float(np.std(arr)),
-        # Temporal coverage: share of onsets faster than the 50 ms startle
-        # threshold. A whole-file median can pass Tier 1 while a minority of
-        # onsets are sharp enough to provoke a startle response.
+        # Both the SHARE and the COUNT of onsets faster than the 50 ms startle
+        # threshold. Count matters: a couple of incidental sharp transients in a
+        # long file should not read the same as pervasive sharp onsets. NOTE:
+        # librosa onset + 10-90% rise is an envelope descriptor, not a validated
+        # startle metric (it ignores absolute level), so this annotates rather
+        # than hard-fails the Tier-1 check.
         "frac_below_50ms": float(np.mean(arr < 50.0) * 100.0),
+        "n_below_50ms": int(np.sum(arr < 50.0)),
     }
 
 
@@ -319,6 +324,12 @@ class Result:
     # passes silently. ---
     roughness_coverage_pct: Optional[float] = None   # % time roughness > 0.3 asper
     sharp_onset_pct: Optional[float] = None           # % onsets attack < 50 ms
+    sharp_onset_count: int = 0                        # count of onsets attack < 50 ms
+    # "full"  = whole file analysed (exact, used for every benchmark track)
+    # "probe" = long file estimated from evenly spaced probes (coverage is a
+    #           SAMPLE — rare events may be missed, so "clean" is never certified)
+    # "truncated" = long file, only the first window analysed (no seeking)
+    analysis_mode: str = "full"
     notes: str = ""
 
 
@@ -346,7 +357,7 @@ _NDIG = {
 def _result_from_signal(y: np.ndarray, fs: int, file: str, duration_s: float,
                         lyrics: str, delivery: str,
                         calibration_offset_db: float = 0.0,
-                        extra_note: str = "") -> Result:
+                        extra_note: str = "", analysis_mode: str = "full") -> Result:
     """Compute a full Result from an in-memory mono signal."""
     import librosa  # lazy
 
@@ -398,14 +409,75 @@ def _result_from_signal(y: np.ndarray, fs: int, file: str, duration_s: float,
                                 if psy.get("roughness_coverage_pct") is not None else None),
         sharp_onset_pct=(round(att["frac_below_50ms"], 1)
                          if att.get("frac_below_50ms") is not None else None),
+        sharp_onset_count=int(att.get("n_below_50ms", 0) or 0),
+        analysis_mode=analysis_mode,
         notes="; ".join(notes),
     )
 
 
+def _stream_level_metrics(path: str, calibration_offset_db: float = 0.0,
+                          win_ms: float = 50.0) -> dict:
+    """Whole-file LAeq (A-weighted energy), dynamic range (p95-p5 of short-term
+    RMS) and crest factor, computed by streaming the file in blocks. These are
+    cheap O(n) operations, so for long files they are computed exactly over the
+    WHOLE recording rather than estimated from probes — unlike the dynamic
+    range, in particular, a few short probes cannot capture the true quiet-to-
+    loud span of a long piece."""
+    import scipy.signal as sps
+    info = sf.info(path)
+    fs = int(info.samplerate)
+    win = max(1, int(fs * win_ms / 1000))
+    sos = a_weighting_filter(fs)
+    zi = sps.sosfilt_zi(sos) * 0.0
+
+    sum_sq_a = 0.0      # A-weighted energy → LAeq
+    n_a = 0
+    sum_sq = 0.0        # broadband energy → global RMS for crest
+    n_tot = 0
+    peak = 0.0
+    st_db = []          # short-term RMS levels (dB) → dynamic range
+    carry = np.empty(0, dtype=np.float64)
+
+    for block in sf.blocks(path, blocksize=fs * 30, dtype="float64",
+                           always_2d=False):
+        if block.ndim > 1:
+            block = np.mean(block, axis=1)
+        block = np.asarray(block, dtype=np.float64)
+        if block.size:
+            peak = max(peak, float(np.max(np.abs(block))))
+        sum_sq += float(np.sum(block * block)); n_tot += block.size
+        ya, zi = sps.sosfilt(sos, block, zi=zi)
+        sum_sq_a += float(np.sum(ya * ya)); n_a += ya.size
+        buf = np.concatenate([carry, block])
+        nwin = len(buf) // win
+        if nwin:
+            frames = buf[:nwin * win].reshape(nwin, win)
+            rms = np.sqrt(np.mean(frames * frames, axis=1) + 1e-20)
+            st_db.append(20.0 * np.log10(rms + 1e-20))
+            carry = buf[nwin * win:]
+        else:
+            carry = buf
+
+    laeq = 10.0 * np.log10(sum_sq_a / max(n_a, 1) + 1e-20) + calibration_offset_db
+    rms_tot = np.sqrt(sum_sq / max(n_tot, 1) + 1e-20)
+    crest = float(20.0 * np.log10(peak / rms_tot)) if peak > 0 else None
+    if st_db:
+        alldb = np.concatenate(st_db)
+        dr = float(np.percentile(alldb, 95) - np.percentile(alldb, 5))
+    else:
+        dr = 0.0
+    return {"laeq_dbfs_a": round(float(laeq), 2),
+            "dynamic_range_db": round(dr, 2),
+            "crest_factor_db": round(crest, 2) if crest is not None else None}
+
+
 def _aggregate_probes(results: list, file: str, duration_s: float, fs: int,
-                      lyrics: str, delivery: str, note: str) -> Result:
-    """Pool per-probe Results: headline = median across probes, coverage =
-    mean across probes, onset count = sum."""
+                      lyrics: str, delivery: str, note: str,
+                      level_override: dict) -> Result:
+    """Pool per-probe Results: the expensive psychoacoustic / spectral metrics
+    are the median across probes; level metrics are overridden with the exact
+    whole-file streamed values; onset count is summed; coverage is pooled but
+    NEVER used to certify "clean" (see tier1_items)."""
     from statistics import median
 
     def med(field):
@@ -420,8 +492,8 @@ def _aggregate_probes(results: list, file: str, duration_s: float, fs: int,
         file=file,
         duration_s=duration_s,
         sample_rate=int(fs),
-        laeq_dbfs_a=med("laeq_dbfs_a"),
-        dynamic_range_db=med("dynamic_range_db"),
+        laeq_dbfs_a=level_override.get("laeq_dbfs_a"),
+        dynamic_range_db=level_override.get("dynamic_range_db"),
         attack_n_onsets=sum((getattr(r, "attack_n_onsets", 0) or 0) for r in results),
         attack_mean_ms=med("attack_mean_ms"),
         attack_median_ms=med("attack_median_ms"),
@@ -436,9 +508,11 @@ def _aggregate_probes(results: list, file: str, duration_s: float, fs: int,
         lyrics=lyrics,
         delivery=delivery,
         spectral_flatness=med("spectral_flatness") or 0.0,
-        crest_factor_db=med("crest_factor_db"),
+        crest_factor_db=level_override.get("crest_factor_db"),
         roughness_coverage_pct=avg("roughness_coverage_pct"),
         sharp_onset_pct=avg("sharp_onset_pct"),
+        sharp_onset_count=sum((getattr(r, "sharp_onset_count", 0) or 0) for r in results),
+        analysis_mode="probe",
         notes=note,
     )
 
@@ -490,16 +564,22 @@ def analyse(path: str, lyrics: str = "unknown", delivery: str = "unknown",
                 f"(format does not support seeking for probe-based analysis)")
         return _result_from_signal(y, fs2, os.path.basename(path), round(dur, 3),
                                    lyrics, delivery, calibration_offset_db,
-                                   extra_note=note)
+                                   extra_note=note, analysis_mode="truncated")
 
     results = [_result_from_signal(p, fs, "probe", round(len(p) / fs, 3),
                                    lyrics, delivery, calibration_offset_db)
                for p in probes]
-    note = (f"probe-based: {len(results)}x{PROBE_S:.0f}s probes spanning "
-            f"{dur:.0f}s (~{int(len(results) * PROBE_S)}s analysed); "
-            f"headline = median across probes, coverage = pooled")
+    # Level metrics (esp. dynamic range) cannot be recovered from short probes,
+    # so compute them exactly over the whole file by streaming.
+    level = _stream_level_metrics(path, calibration_offset_db)
+    analysed_s = int(len(results) * PROBE_S)
+    pct = 100.0 * analysed_s / dur if dur else 0.0
+    note = (f"probe-based: {len(results)}x{PROBE_S:.0f}s probes (~{analysed_s}s, "
+            f"{pct:.1f}% of {dur:.0f}s); level metrics exact (whole-file stream), "
+            f"psychoacoustic/spectral = median across probes; coverage is a "
+            f"sample so 'clean' is NOT certified")
     return _aggregate_probes(results, os.path.basename(path), round(dur, 3),
-                             fs, lyrics, delivery, note)
+                             fs, lyrics, delivery, note, level)
 
 
 def print_report(r: Result) -> None:
@@ -578,55 +658,78 @@ def _fmt(v, n=3):
     return str(v)
 
 
+_SEVERITY = {"PASS": 0, "CAUTION": 1, "FAIL": 2}
+
+
+def _worst_status(*statuses):
+    """Most severe of the given statuses (FAIL > CAUTION > PASS); None if none
+    are gradeable. Used so coverage can only make a verdict more conservative."""
+    cand = [s for s in statuses if s in _SEVERITY]
+    return max(cand, key=lambda s: _SEVERITY[s]) if cand else None
+
+
 def tier1_items(r: Result) -> list[dict]:
     """Tier 1 — Universal design principles."""
     items = []
 
-    # Roughness — coverage-gated. A single rough moment can drive arousal, so
-    # the universal check is on the PROPORTION of time above 0.3 asper, not the
-    # whole-file mean: a tiny excursion is tolerated (ambiguous to call it
-    # "present"), an intermittent one downgrades the tier (the calm gaps don't
-    # earn a clean rating), and a frequent one fails.
+    # Roughness — coverage informs the verdict but only in the SAFE direction:
+    # the status is the more severe of (a) the paper's whole-file 0.3 asper check
+    # and (b) the proportion of time above 0.3 asper. So a high mean still fails
+    # even if coverage looks low, and a low mean is downgraded when rough
+    # passages recur. The per-frame 0.3 threshold and the 2%/10% bands are
+    # provisional screening heuristics, not validated cut-offs. On long files
+    # coverage is sampled (probes), so a "clean" reading is never certified.
     v = r.roughness_asper
     cov = r.roughness_coverage_pct
+    probe = (r.analysis_mode != "full")
     if v is None and cov is None:
         items.append({"parameter": "Roughness", "value": "—", "unit": "asper",
-                      "target": "≤ 2% time > 0.3", "status": "N/A",
+                      "target": "mean < 0.3, ≤ 2% time > 0.3", "status": "N/A",
                       "note": "Roughness unavailable"})
     else:
+        base = None if v is None else ("PASS" if v < 0.3 else "FAIL")
         if cov is None:
-            status = "PASS" if (v is not None and v < 0.3) else "FAIL"
-            note = "Below amygdala-activation threshold (mean only — no coverage)"
+            cov_status, cov_note = None, "no coverage time series"
         elif cov <= 2.0:
-            status, note = "PASS", f"Clean — {_fmt(cov)}% of time above 0.3 asper"
+            cov_status, cov_note = "PASS", f"{_fmt(cov)}% of time above 0.3 asper"
         elif cov <= 10.0:
-            status, note = "CAUTION", f"Intermittent — {_fmt(cov)}% of time above 0.3 asper"
+            cov_status, cov_note = "CAUTION", f"intermittent — {_fmt(cov)}% of time above 0.3 asper"
         else:
-            status, note = "FAIL", f"Frequent — {_fmt(cov)}% of time above 0.3 asper"
+            cov_status, cov_note = "FAIL", f"frequent — {_fmt(cov)}% of time above 0.3 asper"
+        status = _worst_status(base, cov_status)
+        # A sample cannot prove the absence of brief rough events.
+        if probe and status == "PASS":
+            status, cov_note = "CAUTION", cov_note + " (sampled — clean not certified)"
         items.append({"parameter": "Roughness", "value": _fmt(v), "unit": "asper",
-                      "target": "≤ 2% time > 0.3", "status": status, "note": note})
+                      "target": "mean < 0.3, ≤ 2% time > 0.3",
+                      "status": status or "N/A", "note": cov_note})
 
-    # Attack time — coverage-gated on the SHARE of onsets faster than the 50 ms
-    # startle threshold, not just the median (a calm median can still hide a
-    # minority of startling onsets).
+    # Attack time — the Tier-1 verdict is the paper's whole-file median check
+    # (> 50 ms). The share/count of sharp onsets is reported and can raise a
+    # CAUTION, but is NOT a hard fail: librosa onset + 10-90% rise is an envelope
+    # descriptor, not a validated startle metric (it ignores absolute level), and
+    # a couple of incidental transients should not condemn a long, quiet piece.
     v = r.attack_median_ms
     sp = r.sharp_onset_pct
+    nsharp = r.sharp_onset_count or 0
     if v is None and sp is None:
         items.append({"parameter": "Attack time (median)", "value": "—", "unit": "ms",
-                      "target": "≤ 5% onsets < 50", "status": "N/A",
+                      "target": "median > 50", "status": "N/A",
                       "note": "Too few onsets detected"})
     else:
-        if sp is None:
-            status = "PASS" if (v is not None and v > 50.0) else "FAIL"
-            note = "Slow onsets — no startle reflex (median only — no coverage)"
-        elif sp <= 5.0:
-            status, note = "PASS", f"No startle onsets — {_fmt(sp)}% of onsets < 50 ms"
-        elif sp <= 25.0:
-            status, note = "CAUTION", f"Intermittent — {_fmt(sp)}% of onsets < 50 ms"
+        if v is None:
+            status, note = "N/A", "median undefined"
         else:
-            status, note = "FAIL", f"Frequent — {_fmt(sp)}% of onsets < 50 ms"
+            status = "PASS" if v > 50.0 else "FAIL"
+            note = f"median {_fmt(v)} ms"
+        # Sharp-onset annotation can only downgrade PASS→CAUTION, and only when
+        # the pattern is both substantial (share) and non-incidental (count).
+        if status == "PASS" and sp is not None and sp > 25.0 and nsharp >= 5:
+            status = "CAUTION"
+        if sp is not None:
+            note += f"; {_fmt(sp)}% of onsets < 50 ms (n={nsharp})"
         items.append({"parameter": "Attack time (median)", "value": _fmt(v), "unit": "ms",
-                      "target": "≤ 5% onsets < 50", "status": status, "note": note})
+                      "target": "median > 50", "status": status, "note": note})
 
     # Event structure — informational (dynamic range + crest factor)
     dr = r.dynamic_range_db
@@ -787,30 +890,33 @@ def coverage_items(r: Result) -> list[dict]:
             interp = "Intermittent rough passages"
         else:
             interp = "Sustained roughness"
+        sampled = " (sampled — clean not certified)" if r.analysis_mode != "full" else ""
+        note = "Share of duration above the amygdala-activation threshold" + sampled
         items.append({"parameter": "Roughness coverage", "value": f"{_fmt(v)} %",
                       "threshold": "> 0.3 asper",
                       "interpretation": interp,
-                      "note": "Share of duration above the amygdala-activation threshold"})
+                      "note": note})
 
     v = r.sharp_onset_pct
+    n = r.sharp_onset_count or 0
     if v is None:
-        items.append({"parameter": "Sharp-onset coverage", "value": "—",
+        items.append({"parameter": "Sharp-onset share", "value": "—",
                       "threshold": "< 50 ms",
                       "interpretation": "—",
                       "note": "Too few onsets detected"})
     else:
-        if v == 0:
+        if n == 0:
             interp = "No startle-range onsets"
-        elif v < 10:
-            interp = "A few sharp onsets"
+        elif v < 10 or n < 5:
+            interp = "A few sharp onsets (incidental)"
         elif v < 33:
             interp = "Notable share of sharp onsets"
         else:
             interp = "Predominantly sharp onsets"
-        items.append({"parameter": "Sharp-onset coverage", "value": f"{_fmt(v)} %",
+        items.append({"parameter": "Sharp-onset share", "value": f"{_fmt(v)} % (n={n})",
                       "threshold": "< 50 ms",
                       "interpretation": interp,
-                      "note": "Share of onsets faster than the startle threshold (median can still pass)"})
+                      "note": "Envelope descriptor, not a validated startle metric — annotation only"})
 
     return items
 
