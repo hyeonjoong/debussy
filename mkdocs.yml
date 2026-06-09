@@ -1,6 +1,6 @@
 site_name: DEBUSSY
 site_url: https://jjjooong.github.io/debussy
-repo_url: https://github.com/jjjooong/debussy
+repo_url: https://github.com/hyeonjoong/debussy
 theme:
   name: material
   features:

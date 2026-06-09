@@ -2,7 +2,7 @@
 """
 DEBUSSY — Descriptive Evidence-Based aUditory Stimulus SurveY
 
-Computes the 11-item acoustic reporting parameters proposed in the BELL
+Computes the 12-item acoustic reporting parameters proposed in the BELL
 Therapeutics sound paper (Kim, Ha, Park, Thayer, Bosi, Eerola — Table 2 of
 the manuscript "Acoustic Parameters and Norms for Autonomic Arousal
 Modulation").
@@ -100,7 +100,7 @@ def attack_times_ms(y: np.ndarray, fs: int, librosa) -> dict:
     )
     if len(onsets) < 2:
         return {"n_onsets": int(len(onsets)), "mean_ms": None,
-                "median_ms": None, "sd_ms": None}
+                "median_ms": None, "sd_ms": None, "frac_below_50ms": None}
 
     env = np.abs(sps.hilbert(y))
     smoothing_n = max(1, int(0.005 * fs))  # 5 ms smoothing
@@ -128,13 +128,17 @@ def attack_times_ms(y: np.ndarray, fs: int, librosa) -> dict:
 
     if not attacks:
         return {"n_onsets": int(len(onsets)), "mean_ms": None,
-                "median_ms": None, "sd_ms": None}
+                "median_ms": None, "sd_ms": None, "frac_below_50ms": None}
     arr = np.array(attacks)
     return {
         "n_onsets": int(len(onsets)),
         "mean_ms": float(np.mean(arr)),
         "median_ms": float(np.median(arr)),
         "sd_ms": float(np.std(arr)),
+        # Temporal coverage: share of onsets faster than the 50 ms startle
+        # threshold. A whole-file median can pass Tier 1 while a minority of
+        # onsets are sharp enough to provoke a startle response.
+        "frac_below_50ms": float(np.mean(arr < 50.0) * 100.0),
     }
 
 
@@ -254,11 +258,19 @@ def hnr_db(y: np.ndarray, fs: int,
 def psychoacoustics(y: np.ndarray, fs: int) -> dict:
     """Compute roughness (asper) and sharpness (acum) using mosqito."""
     out = {"roughness_asper": None, "sharpness_acum": None,
-           "loudness_sone": None}
+           "loudness_sone": None, "roughness_coverage_pct": None}
     try:
         from mosqito.sq_metrics import roughness_dw
         R, _, _, _ = roughness_dw(y, fs, overlap=0.5)
+        R = np.asarray(R, dtype=float)
         out["roughness_asper"] = float(np.nanmean(R))
+        # Temporal coverage: share of the duration whose instantaneous
+        # roughness exceeds the 0.3 asper amygdala-activation threshold.
+        # The whole-file mean can stay below 0.3 while brief rough passages
+        # still cross it — coverage exposes that proportion.
+        finite = R[np.isfinite(R)]
+        if finite.size:
+            out["roughness_coverage_pct"] = float(np.mean(finite > 0.3) * 100.0)
     except Exception as e:
         out["_roughness_err"] = str(e)
     try:
@@ -300,16 +312,43 @@ class Result:
     delivery: str
     spectral_flatness: float
     crest_factor_db: Optional[float] = None
+    # --- Temporal coverage (exploratory; additive — does NOT alter the 12
+    # headline parameters or the validation benchmark). Each reports the
+    # PROPORTION of the stimulus that violates a Tier-1 threshold, so a long
+    # clip that is calm on average but has brief harsh passages no longer
+    # passes silently. ---
+    roughness_coverage_pct: Optional[float] = None   # % time roughness > 0.3 asper
+    sharp_onset_pct: Optional[float] = None           # % onsets attack < 50 ms
     notes: str = ""
 
 
-def analyse(path: str, lyrics: str = "unknown", delivery: str = "unknown",
-            calibration_offset_db: float = 0.0) -> Result:
+# --- Long-file handling -------------------------------------------------------
+# mosqito's roughness runs at ~1.7x real time and an 8 h file would not fit in
+# memory, so files longer than MAX_ANALYZE_S are characterised from evenly
+# spaced short probes spanning the whole recording rather than by a duration
+# cap (long ambient/sleep pieces are legitimate stimuli). Short files — which
+# includes every validation-benchmark track — are analysed in full, byte for
+# byte as before, so the published parameter values are unchanged.
+MAX_ANALYZE_S = 90.0      # analyse in full up to this duration
+PROBE_S = 6.0             # length of each probe window (s)
+PROBE_BUDGET_S = 60.0     # total audio analysed for long files (s)
+
+# Per-field rounding used when aggregating probes (matches _result_from_signal).
+_NDIG = {
+    "laeq_dbfs_a": 2, "dynamic_range_db": 2, "crest_factor_db": 2,
+    "attack_mean_ms": 2, "attack_median_ms": 2, "attack_sd_ms": 2,
+    "roughness_asper": 3, "tempo_bpm": 1, "modulation_peak_hz": 3,
+    "spectral_centroid_hz": 1, "sharpness_acum": 3, "spectral_slope_beta": 3,
+    "hnr_db": 2, "spectral_flatness": 4,
+}
+
+
+def _result_from_signal(y: np.ndarray, fs: int, file: str, duration_s: float,
+                        lyrics: str, delivery: str,
+                        calibration_offset_db: float = 0.0,
+                        extra_note: str = "") -> Result:
+    """Compute a full Result from an in-memory mono signal."""
     import librosa  # lazy
-    y, fs = sf.read(path, always_2d=False)
-    if y.ndim > 1:
-        y = np.mean(y, axis=1)
-    y = y.astype(np.float64)
 
     laeq = laeq_dbfs(y, fs) + calibration_offset_db
     drange = dynamic_range_db(y, fs)
@@ -331,10 +370,12 @@ def analyse(path: str, lyrics: str = "unknown", delivery: str = "unknown",
     for k in ("_roughness_err", "_sharpness_err"):
         if psy.get(k):
             notes.append(f"{k.strip('_')}: {psy[k]}")
+    if extra_note:
+        notes.append(extra_note)
 
     return Result(
-        file=os.path.basename(path),
-        duration_s=round(len(y) / fs, 3),
+        file=file,
+        duration_s=duration_s,
         sample_rate=int(fs),
         laeq_dbfs_a=round(laeq, 2),
         dynamic_range_db=round(drange, 2),
@@ -353,8 +394,112 @@ def analyse(path: str, lyrics: str = "unknown", delivery: str = "unknown",
         delivery=delivery,
         spectral_flatness=round(flat, 4),
         crest_factor_db=round(crest_db, 2) if crest_db is not None else None,
+        roughness_coverage_pct=(round(psy["roughness_coverage_pct"], 1)
+                                if psy.get("roughness_coverage_pct") is not None else None),
+        sharp_onset_pct=(round(att["frac_below_50ms"], 1)
+                         if att.get("frac_below_50ms") is not None else None),
         notes="; ".join(notes),
     )
+
+
+def _aggregate_probes(results: list, file: str, duration_s: float, fs: int,
+                      lyrics: str, delivery: str, note: str) -> Result:
+    """Pool per-probe Results: headline = median across probes, coverage =
+    mean across probes, onset count = sum."""
+    from statistics import median
+
+    def med(field):
+        vals = [getattr(r, field) for r in results if getattr(r, field) is not None]
+        return round(float(median(vals)), _NDIG.get(field, 3)) if vals else None
+
+    def avg(field):
+        vals = [getattr(r, field) for r in results if getattr(r, field) is not None]
+        return round(float(sum(vals) / len(vals)), 1) if vals else None
+
+    return Result(
+        file=file,
+        duration_s=duration_s,
+        sample_rate=int(fs),
+        laeq_dbfs_a=med("laeq_dbfs_a"),
+        dynamic_range_db=med("dynamic_range_db"),
+        attack_n_onsets=sum((getattr(r, "attack_n_onsets", 0) or 0) for r in results),
+        attack_mean_ms=med("attack_mean_ms"),
+        attack_median_ms=med("attack_median_ms"),
+        attack_sd_ms=med("attack_sd_ms"),
+        roughness_asper=med("roughness_asper"),
+        tempo_bpm=med("tempo_bpm"),
+        modulation_peak_hz=med("modulation_peak_hz"),
+        spectral_centroid_hz=med("spectral_centroid_hz") or 0.0,
+        sharpness_acum=med("sharpness_acum"),
+        spectral_slope_beta=med("spectral_slope_beta"),
+        hnr_db=med("hnr_db"),
+        lyrics=lyrics,
+        delivery=delivery,
+        spectral_flatness=med("spectral_flatness") or 0.0,
+        crest_factor_db=med("crest_factor_db"),
+        roughness_coverage_pct=avg("roughness_coverage_pct"),
+        sharp_onset_pct=avg("sharp_onset_pct"),
+        notes=note,
+    )
+
+
+def analyse(path: str, lyrics: str = "unknown", delivery: str = "unknown",
+            calibration_offset_db: float = 0.0) -> Result:
+    info = sf.info(path)
+    fs = int(info.samplerate)
+    total = int(info.frames)
+    dur = float(total) / float(fs) if fs else 0.0
+
+    # Short files (incl. every benchmark track): analyse in full, unchanged.
+    if dur <= MAX_ANALYZE_S:
+        y, fs2 = sf.read(path, always_2d=False)
+        if y.ndim > 1:
+            y = np.mean(y, axis=1)
+        y = y.astype(np.float64)
+        return _result_from_signal(y, fs2, os.path.basename(path),
+                                   round(len(y) / fs2, 3),
+                                   lyrics, delivery, calibration_offset_db)
+
+    # Long files: evenly spaced short probes spanning the whole recording.
+    probe_frames = int(PROBE_S * fs)
+    n_probes = max(4, int(PROBE_BUDGET_S / PROBE_S))
+    span = total - probe_frames
+    starts = ([0] if span <= 0
+              else [int(round(span * i / (n_probes - 1))) for i in range(n_probes)])
+
+    probes = []
+    for s in starts:
+        try:
+            blk, _ = sf.read(path, start=s, stop=min(s + probe_frames, total),
+                             always_2d=False)
+        except Exception:
+            continue
+        if blk.ndim > 1:
+            blk = np.mean(blk, axis=1)
+        if len(blk) >= int(0.5 * fs):
+            probes.append(blk.astype(np.float64))
+
+    if not probes:
+        # Seeking unsupported for this format: fall back to the first window.
+        y, fs2 = sf.read(path, start=0, stop=min(int(MAX_ANALYZE_S * fs), total),
+                         always_2d=False)
+        if y.ndim > 1:
+            y = np.mean(y, axis=1)
+        y = y.astype(np.float64)
+        note = (f"truncated: first {len(y) / fs2:.0f}s of {dur:.0f}s "
+                f"(format does not support seeking for probe-based analysis)")
+        return _result_from_signal(y, fs2, os.path.basename(path), round(dur, 3),
+                                   lyrics, delivery, calibration_offset_db,
+                                   extra_note=note)
+
+    results = [_result_from_signal(p, fs, "probe", round(len(p) / fs, 3),
+                                   lyrics, delivery, calibration_offset_db)
+               for p in probes]
+    note = (f"probe-based: {len(results)}x{PROBE_S:.0f}s probes spanning "
+            f"{dur:.0f}s (~{int(len(results) * PROBE_S)}s analysed); "
+            f"headline = median across probes, coverage = pooled")
+    return _aggregate_probes(results, os.path.basename(path), round(dur, 3),
+                             fs, lyrics, delivery, note)
 
 
 def print_report(r: Result) -> None:
@@ -437,29 +582,51 @@ def tier1_items(r: Result) -> list[dict]:
     """Tier 1 — Universal design principles."""
     items = []
 
-    # Roughness — PASS/FAIL at 0.3 asper
+    # Roughness — coverage-gated. A single rough moment can drive arousal, so
+    # the universal check is on the PROPORTION of time above 0.3 asper, not the
+    # whole-file mean: a tiny excursion is tolerated (ambiguous to call it
+    # "present"), an intermittent one downgrades the tier (the calm gaps don't
+    # earn a clean rating), and a frequent one fails.
     v = r.roughness_asper
-    if v is None:
+    cov = r.roughness_coverage_pct
+    if v is None and cov is None:
         items.append({"parameter": "Roughness", "value": "—", "unit": "asper",
-                      "target": "< 0.3", "status": "N/A",
-                      "note": "Below amygdala-activation threshold"})
+                      "target": "≤ 2% time > 0.3", "status": "N/A",
+                      "note": "Roughness unavailable"})
     else:
+        if cov is None:
+            status = "PASS" if (v is not None and v < 0.3) else "FAIL"
+            note = "Below amygdala-activation threshold (mean only — no coverage)"
+        elif cov <= 2.0:
+            status, note = "PASS", f"Clean — {_fmt(cov)}% of time above 0.3 asper"
+        elif cov <= 10.0:
+            status, note = "CAUTION", f"Intermittent — {_fmt(cov)}% of time above 0.3 asper"
+        else:
+            status, note = "FAIL", f"Frequent — {_fmt(cov)}% of time above 0.3 asper"
         items.append({"parameter": "Roughness", "value": _fmt(v), "unit": "asper",
-                      "target": "< 0.3",
-                      "status": "PASS" if v < 0.3 else "FAIL",
-                      "note": "Below amygdala-activation threshold"})
+                      "target": "≤ 2% time > 0.3", "status": status, "note": note})
 
-    # Attack time (MEDIAN) — PASS/FAIL at 50 ms
+    # Attack time — coverage-gated on the SHARE of onsets faster than the 50 ms
+    # startle threshold, not just the median (a calm median can still hide a
+    # minority of startling onsets).
     v = r.attack_median_ms
-    if v is None:
+    sp = r.sharp_onset_pct
+    if v is None and sp is None:
         items.append({"parameter": "Attack time (median)", "value": "—", "unit": "ms",
-                      "target": "> 50", "status": "N/A",
-                      "note": "Slow onsets — no startle reflex"})
+                      "target": "≤ 5% onsets < 50", "status": "N/A",
+                      "note": "Too few onsets detected"})
     else:
+        if sp is None:
+            status = "PASS" if (v is not None and v > 50.0) else "FAIL"
+            note = "Slow onsets — no startle reflex (median only — no coverage)"
+        elif sp <= 5.0:
+            status, note = "PASS", f"No startle onsets — {_fmt(sp)}% of onsets < 50 ms"
+        elif sp <= 25.0:
+            status, note = "CAUTION", f"Intermittent — {_fmt(sp)}% of onsets < 50 ms"
+        else:
+            status, note = "FAIL", f"Frequent — {_fmt(sp)}% of onsets < 50 ms"
         items.append({"parameter": "Attack time (median)", "value": _fmt(v), "unit": "ms",
-                      "target": "> 50",
-                      "status": "PASS" if v > 50.0 else "FAIL",
-                      "note": "Slow onsets — no startle reflex"})
+                      "target": "≤ 5% onsets < 50", "status": status, "note": note})
 
     # Event structure — informational (dynamic range + crest factor)
     dr = r.dynamic_range_db
@@ -590,15 +757,112 @@ def tier3_items(r: Result) -> list[dict]:
     return items
 
 
+# ---------- Temporal coverage (exploratory, length-aware) ----------
+#
+# The 12 headline parameters are whole-file aggregates (means / percentiles),
+# so a long stimulus that is calm on average can still contain brief passages
+# that cross a Tier-1 threshold — and a mean hides them. Coverage reports the
+# PROPORTION of the stimulus that violates each threshold, which is the
+# clinically relevant quantity for a "do no harm / no startle" design check
+# (a single sharp onset can drive arousal regardless of the average).
+#
+# This is additive and report-only: it does not change any of the 12
+# parameters or the validation benchmark.
+
+def coverage_items(r: Result) -> list[dict]:
+    items = []
+
+    v = r.roughness_coverage_pct
+    if v is None:
+        items.append({"parameter": "Roughness coverage", "value": "—",
+                      "threshold": "> 0.3 asper",
+                      "interpretation": "—",
+                      "note": "Roughness time series unavailable"})
+    else:
+        if v == 0:
+            interp = "Clean — never crosses threshold"
+        elif v < 5:
+            interp = "Brief excursions only"
+        elif v < 25:
+            interp = "Intermittent rough passages"
+        else:
+            interp = "Sustained roughness"
+        items.append({"parameter": "Roughness coverage", "value": f"{_fmt(v)} %",
+                      "threshold": "> 0.3 asper",
+                      "interpretation": interp,
+                      "note": "Share of duration above the amygdala-activation threshold"})
+
+    v = r.sharp_onset_pct
+    if v is None:
+        items.append({"parameter": "Sharp-onset coverage", "value": "—",
+                      "threshold": "< 50 ms",
+                      "interpretation": "—",
+                      "note": "Too few onsets detected"})
+    else:
+        if v == 0:
+            interp = "No startle-range onsets"
+        elif v < 10:
+            interp = "A few sharp onsets"
+        elif v < 33:
+            interp = "Notable share of sharp onsets"
+        else:
+            interp = "Predominantly sharp onsets"
+        items.append({"parameter": "Sharp-onset coverage", "value": f"{_fmt(v)} %",
+                      "threshold": "< 50 ms",
+                      "interpretation": interp,
+                      "note": "Share of onsets faster than the startle threshold (median can still pass)"})
+
+    return items
+
+
+def plot_coverage(r: Result):
+    """Horizontal bars showing the proportion of the stimulus that violates
+    each Tier-1 threshold (0 % = clean, 100 % = always violating)."""
+    import matplotlib.pyplot as plt
+    rows = [
+        ("Roughness > 0.3 asper", r.roughness_coverage_pct),
+        ("Onsets < 50 ms",        r.sharp_onset_pct),
+    ]
+    labels = [a for a, _ in rows]
+    vals = [(b if b is not None else 0.0) for _, b in rows]
+
+    def _col(p):
+        if p is None:
+            return "#cccccc"
+        if p == 0:
+            return "#2ca02c"
+        if p < 5:
+            return "#a8d08d"
+        if p < 25:
+            return "#f4b400"
+        return "#d62728"
+
+    colors = [_col(b) for _, b in rows]
+    fig, ax = plt.subplots(figsize=(7.5, 2.4), dpi=110)
+    ax.barh(range(len(labels)), vals, color=colors, edgecolor="white")
+    ax.set_yticks(range(len(labels)))
+    ax.set_yticklabels(labels, fontsize=9)
+    ax.invert_yaxis()
+    ax.set_xlim(0, 100)
+    ax.set_xlabel("% of stimulus duration violating threshold", fontsize=9)
+    for i, (b) in enumerate(vals):
+        txt = "—" if rows[i][1] is None else f"{b:.0f}%"
+        ax.text(min(b + 2, 95), i, txt, va="center", fontsize=8)
+    ax.set_title("Temporal coverage — how much, not just whether (exploratory)",
+                 fontsize=10)
+    fig.tight_layout()
+    return fig
+
+
 # Backwards-compatible aliases for older callers
 def tier1_compliance(r: Result) -> dict:
     items = tier1_items(r)
     n_pass = sum(1 for it in items if it["status"] == "PASS")
-    n_eval = sum(1 for it in items if it["status"] in ("PASS", "FAIL"))
+    n_eval = sum(1 for it in items if it["status"] in ("PASS", "FAIL", "CAUTION"))
     # Re-shape to match old API
     checks = []
     for it in items:
-        if it["status"] in ("PASS", "FAIL", "N/A"):
+        if it["status"] in ("PASS", "FAIL", "CAUTION", "N/A"):
             checks.append({
                 "parameter": it["parameter"],
                 "value": it["value"],
@@ -614,8 +878,8 @@ def format_compliance(r: Result) -> str:
     """Text rendering of all three tiers for the CLI."""
     lines = ["", "=== Tier 1 — Universal Design Check ==="]
     for it in tier1_items(r):
-        mark = {"PASS": "[PASS]", "FAIL": "[FAIL]", "INFO": "[INFO]",
-                "MANUAL": "[MAN ]", "N/A": "[N/A ]"}[it["status"]]
+        mark = {"PASS": "[PASS]", "FAIL": "[FAIL]", "CAUTION": "[CAUT]",
+                "INFO": "[INFO]", "MANUAL": "[MAN ]", "N/A": "[N/A ]"}[it["status"]]
         lines.append(f"  {mark} {it['parameter']:24} {str(it['value']):>22} {it['unit']:6}"
                      f"  target {it['target']:<14}  {it['note']}")
     lines += ["", "=== Tier 2 — Directional Guidelines ==="]
@@ -693,6 +957,7 @@ def plot_tier_compliance(r: Result):
     status_color = {
         "PASS":         "#2ca02c",
         "FAIL":         "#d62728",
+        "CAUTION":      "#e67e22",
         "IN_RANGE":     "#f4b400",
         "OUT_OF_RANGE": "#e67e22",
         "DIRECTIONAL":  "#bbbbbb",
@@ -716,7 +981,7 @@ def plot_tier_compliance(r: Result):
     ax.set_xticks([])
     ax.set_xlim(0, 1)
     n_t1_pass = sum(1 for it in tier1_items(r) if it["status"] == "PASS")
-    n_t1_eval = sum(1 for it in tier1_items(r) if it["status"] in ("PASS", "FAIL"))
+    n_t1_eval = sum(1 for it in tier1_items(r) if it["status"] in ("PASS", "FAIL", "CAUTION"))
     ax.set_title(f"Three-tier framework — Tier 1: {n_t1_pass}/{n_t1_eval} pass", fontsize=10)
     fig.tight_layout()
     return fig
@@ -724,7 +989,7 @@ def plot_tier_compliance(r: Result):
 
 def main() -> int:
     ap = argparse.ArgumentParser(
-        description="Compute 11-item acoustic reporting parameters for audio file(s).")
+        description="Compute 12-item acoustic reporting parameters for audio file(s).")
     ap.add_argument("files", nargs="+", help="Audio file(s) (wav/flac/mp3 — anything soundfile/librosa can read)")
     ap.add_argument("--csv", help="Append results to this CSV file (created if missing)")
     ap.add_argument("--lyrics", choices=["yes", "no", "unknown"], default="unknown",

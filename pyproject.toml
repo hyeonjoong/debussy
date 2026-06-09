@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "debussy-audio"
 version = "0.1.0"
-description = "11-parameter acoustic reporting toolbox for autonomic-arousal stimulus preparation."
+description = "12-parameter acoustic reporting toolbox for autonomic-arousal stimulus preparation."
 readme = "README.md"
 requires-python = ">=3.10"
 license = {file = "LICENSE"}
@@ -62,10 +62,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/jjjooong/debussy"
-Documentation = "https://github.com/jjjooong/debussy#readme"
-Repository = "https://github.com/jjjooong/debussy"
-Issues = "https://github.com/jjjooong/debussy/issues"
+Homepage = "https://github.com/hyeonjoong/debussy"
+Documentation = "https://github.com/hyeonjoong/debussy#readme"
+Repository = "https://github.com/hyeonjoong/debussy"
+Issues = "https://github.com/hyeonjoong/debussy/issues"
 "HuggingFace Demo" = "https://huggingface.co/spaces/jjjooong/debussy"
 
 [project.scripts]
@@ -80,6 +80,9 @@ debussy = ["py.typed"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v --tb=short"
+markers = [
+  "slow: marks tests that run the full pipeline on long audio (deselect with '-m \"not slow\"')",
+]
 filterwarnings = [
   "ignore::DeprecationWarning",
   "ignore::PendingDeprecationWarning",

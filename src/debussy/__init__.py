@@ -1,4 +1,4 @@
-"""DEBUSSY — 11-parameter acoustic reporting for autonomic-arousal stimulus preparation.
+"""DEBUSSY — 12-parameter acoustic reporting for autonomic-arousal stimulus preparation.
 
 Public API:
 
@@ -7,7 +7,11 @@ Public API:
     >>> result.laeq_dbfs_a
     -17.89
 
-The :class:`Result` dataclass exposes all 11 reporting parameters plus run metadata.
+The :class:`Result` dataclass exposes all 12 reporting parameters plus run
+metadata, and additive temporal-coverage descriptors
+(``roughness_coverage_pct``, ``sharp_onset_pct``) reporting the proportion of
+the stimulus that crosses each Tier-1 threshold — so a long clip that is calm
+on average no longer hides brief harsh passages.
 See the :mod:`debussy.level`, :mod:`debussy.envelope`, :mod:`debussy.spectral`,
 :mod:`debussy.tonal`, and :mod:`debussy.psychoacoustic` submodules for the
 parameter-family groupings.
@@ -24,10 +28,13 @@ from ._core import (
     tier3_items,
     tier1_compliance,
     format_compliance,
+    # Temporal coverage (length-aware, additive)
+    coverage_items,
     # Plots (optional, require matplotlib)
     plot_spectrogram,
     plot_parameter_radar,
     plot_tier_compliance,
+    plot_coverage,
 )
 
 __version__ = "0.1.0"
@@ -42,8 +49,10 @@ __all__ = [
     "tier3_items",
     "tier1_compliance",
     "format_compliance",
+    "coverage_items",
     "plot_spectrogram",
     "plot_parameter_radar",
     "plot_tier_compliance",
+    "plot_coverage",
     "__version__",
 ]
