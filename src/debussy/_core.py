@@ -336,13 +336,14 @@ class Result:
 # cap (long ambient/sleep pieces are legitimate stimuli). Short files — which
 # includes every validation-benchmark track — are analysed in full, byte for
 # byte as before, so the published parameter values are unchanged.
-# Kept just above the longest validation-benchmark track (45.1 s) so every
-# benchmark track is still analysed in full (byte-identical), while any longer
-# upload — i.e. real music, minutes long — takes the bounded probe path. The
-# psychoacoustic metrics (mosqito roughness/sharpness/loudness) dominate runtime
-# and are ~real-time on broadband audio, so the probe budget is kept small to
-# stay well under the Hugging Face Spaces request timeout on a 2-vCPU worker.
-MAX_ANALYZE_S = 50.0      # analyse in full up to this duration
+# Default kept just above the longest validation-benchmark track (45.1 s) so
+# every benchmark track is still analysed in full (byte-identical reproduction),
+# while any longer upload takes the bounded probe path. The psychoacoustic
+# metrics (mosqito roughness/sharpness) run ~real-time on broadband audio, so a
+# dense 45 s clip can take ~1 minute on a slow CPU. The interactive Space lowers
+# this via DEBUSSY_MAX_ANALYZE_S so even short dense clips stay responsive; the
+# library keeps the 50 s default for exact benchmark reproduction.
+MAX_ANALYZE_S = float(os.environ.get("DEBUSSY_MAX_ANALYZE_S", "50.0"))
 PROBE_S = 3.0             # length of each probe window (s)
 PROBE_BUDGET_S = 18.0     # total audio analysed for long files (s)
 
