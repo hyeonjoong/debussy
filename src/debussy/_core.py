@@ -263,7 +263,7 @@ def hnr_db(y: np.ndarray, fs: int,
 def psychoacoustics(y: np.ndarray, fs: int) -> dict:
     """Compute roughness (asper) and sharpness (acum) using mosqito."""
     out = {"roughness_asper": None, "sharpness_acum": None,
-           "loudness_sone": None, "roughness_coverage_pct": None}
+           "roughness_coverage_pct": None}
     try:
         from mosqito.sq_metrics import roughness_dw
         R, _, _, _ = roughness_dw(y, fs, overlap=0.5)
@@ -284,12 +284,8 @@ def psychoacoustics(y: np.ndarray, fs: int) -> dict:
         out["sharpness_acum"] = float(np.nanmean(S))
     except Exception as e:
         out["_sharpness_err"] = str(e)
-    try:
-        from mosqito.sq_metrics import loudness_zwst
-        N, _, _ = loudness_zwst(y, fs)
-        out["loudness_sone"] = float(np.nanmean(N))
-    except Exception:
-        pass
+    # (Zwicker loudness was previously computed here but never surfaced in
+    # Result — dropped to avoid the wasted per-probe runtime.)
     return out
 
 
@@ -340,9 +336,15 @@ class Result:
 # cap (long ambient/sleep pieces are legitimate stimuli). Short files — which
 # includes every validation-benchmark track — are analysed in full, byte for
 # byte as before, so the published parameter values are unchanged.
-MAX_ANALYZE_S = 90.0      # analyse in full up to this duration
-PROBE_S = 6.0             # length of each probe window (s)
-PROBE_BUDGET_S = 60.0     # total audio analysed for long files (s)
+# Kept just above the longest validation-benchmark track (45.1 s) so every
+# benchmark track is still analysed in full (byte-identical), while any longer
+# upload — i.e. real music, minutes long — takes the bounded probe path. The
+# psychoacoustic metrics (mosqito roughness/sharpness/loudness) dominate runtime
+# and are ~real-time on broadband audio, so the probe budget is kept small to
+# stay well under the Hugging Face Spaces request timeout on a 2-vCPU worker.
+MAX_ANALYZE_S = 50.0      # analyse in full up to this duration
+PROBE_S = 3.0             # length of each probe window (s)
+PROBE_BUDGET_S = 18.0     # total audio analysed for long files (s)
 
 # Per-field rounding used when aggregating probes (matches _result_from_signal).
 _NDIG = {
