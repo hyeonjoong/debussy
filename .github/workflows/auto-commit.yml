@@ -1,0 +1,71 @@
+name: auto-commit
+
+# Laptop-independent replacement for the old local launchd auto-commit.
+# Runs on GitHub's own infrastructure every day at ~10:00 KST. A Python runner
+# picks the current week's Tue/Fri scaffold task from the 26-week JOSS plan
+# (self-healing catch-up: if a run is ever skipped it fires the earliest
+# still-pending task). The change is validated with pytest BEFORE anything is
+# committed, so a malformed scaffold can never land on main. Pushes with the
+# built-in GITHUB_TOKEN, so there is no personal access token to renew.
+
+on:
+  schedule:
+    - cron: "0 1 * * *"   # 01:00 UTC daily (~10:00 KST). Fires Tue/Fri tasks; no-op other days.
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Fire the earliest pending task even if its weekday hasn't arrived (test only)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: debussy-auto-commit
+  cancel-in-progress: false
+
+jobs:
+  auto-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so the runner can dedupe by commit message
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install system audio deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsndfile1 ffmpeg
+
+      - name: Install DEBUSSY + test extras
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test]"
+
+      - name: Pick + apply today's scaffold task
+        id: pick
+        run: |
+          python .github/auto-commit/ci_runner.py \
+            ${{ (github.event_name == 'workflow_dispatch' && inputs.force) && '--force' || '' }}
+
+      - name: Validate with pytest before committing
+        if: steps.pick.outputs.changed == 'true'
+        run: pytest -q
+
+      - name: Commit + push
+        if: steps.pick.outputs.changed == 'true'
+        run: |
+          git config user.name "Hyeon-Joong Kim"
+          git config user.email "hyeonjoong.kim@belltherapeutics.com"
+          git add -A
+          git commit -F "${{ steps.pick.outputs.msg_file }}"
+          git push origin HEAD:main
+          echo "Pushed: $(git log -1 --format='%h %s')"
