@@ -9,4 +9,4 @@ import pytest
 def test_tests_resample_warn():
     pass
 
-<!-- 2026-07-07 :: tests-resample-warn :: tests: cover the 44.1 → 48 kHz resample warning path explicitly -->
+# 2026-07-07 :: tests-resample-warn :: tests: cover the 44.1 → 48 kHz resample warning path explicitly

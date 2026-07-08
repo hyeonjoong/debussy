@@ -1135,4 +1135,4 @@ def main() -> int:
 if __name__ == "__main__":
     sys.exit(main())
 
-<!-- 2026-07-08 :: core-typing :: refactor(core): tighten type hints on the public analyze_audio() signature -->
+# 2026-07-08 :: core-typing :: refactor(core): tighten type hints on the public analyze_audio() signature
