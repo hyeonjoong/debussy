@@ -35,7 +35,7 @@ jobs:
           echo "Last commit: $(git log -1 --format='%ci  %s')"
           echo "Age: ${age_days} day(s); threshold: ${STALE_DAYS} day(s)."
           if [ "$age_days" -gt "${STALE_DAYS}" ]; then
-            echo "::error::DEBUSSY commit history has stalled (${age_days} days since the last commit). The local auto-commit automation may be dead — check launchctl list | grep debussy and ~/Library/Logs/debussy/."
+            echo "::error::DEBUSSY commit history has stalled (${age_days} days since the last commit). The cloud auto-commit workflow may be failing or disabled — check the 'auto-commit' workflow runs in the Actions tab; GitHub disables scheduled workflows after 60 days of no repo activity."
             exit 1
           fi
           echo "OK — commit history is active."
