@@ -20,7 +20,7 @@ jobs:
   heartbeat:
     runs-on: ubuntu-latest
     env:
-      STALE_DAYS: "4"     # commits are scheduled Tue+Fri, so >4 days = a miss
+      STALE_DAYS: "7"     # plan weeks start on a Wed and can finish early, so gaps up to ~7d are normal; >7 = a real miss
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
