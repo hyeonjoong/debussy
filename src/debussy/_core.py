@@ -271,12 +271,22 @@ def hnr_db(y: np.ndarray, fs: int,
 def psychoacoustics(y: np.ndarray, fs: int, suppress_warnings: bool = False) -> dict:
     """Compute roughness (asper) and sharpness (acum) using mosqito.
 
-    mosqito prints a ``[Warning] Signal resampled to 48 kHz ...`` line to stdout
-    whenever ``fs`` is not 48 kHz. Pass ``suppress_warnings=True`` to redirect
-    that stdout chatter into a throwaway buffer so batch runs stay quiet.
+    mosqito's metrics require 48 kHz, so any other sample rate is resampled
+    internally. DEBUSSY emits a UserWarning to that effect (some mosqito builds
+    additionally print their own notice to stdout, others stay silent — hence a
+    library-owned warning here rather than depending on mosqito's output).
+    ``suppress_warnings=True`` silences both: it skips the DEBUSSY warning and
+    redirects any mosqito stdout into a throwaway buffer, so batch runs stay quiet.
     """
     out = {"roughness_asper": None, "sharpness_acum": None,
            "roughness_coverage_pct": None}
+
+    if fs != 48000 and not suppress_warnings:
+        warnings.warn(
+            f"psychoacoustic metrics: {fs} Hz signal is resampled to 48 kHz by "
+            f"mosqito for roughness/sharpness.",
+            UserWarning, stacklevel=2,
+        )
 
     def _quiet():
         return (contextlib.redirect_stdout(io.StringIO())
@@ -703,8 +713,8 @@ def analyze_audio(audio_file: str,
     calibration_offset_db:
         dB offset added to LAeq for SPL calibration (default 0 → dBFS-A).
     suppress_warnings:
-        When ``True``, silence mosqito's ``resampled to 48 kHz`` stdout notice
-        and the full-scale clipping warning — useful for quiet batch runs.
+        When ``True``, silence the 48 kHz resample notice and the full-scale
+        clipping warning — useful for quiet batch runs.
     """
     lyrics = lyrics_presence if lyrics_presence in ("yes", "no") else "unknown"
     return analyse(audio_file, lyrics=lyrics,
