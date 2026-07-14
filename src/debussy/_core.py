@@ -39,9 +39,13 @@ Notes on calibration:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import csv
+import io
+import json
 import os
 import sys
+import warnings
 from dataclasses import dataclass, asdict, field
 from typing import Optional
 
@@ -197,7 +201,11 @@ def spectral_flatness(y: np.ndarray, librosa) -> float:
 def spectral_slope(y: np.ndarray, fs: int) -> dict:
     """Linear fit of log10(power) vs log10(frequency), 50 Hz – fs/2.
     Returns beta (slope), and the analysis band edges."""
-    n = 1 << int(np.ceil(np.log2(min(len(y), 65536))))
+    # Largest power of two that FITS the signal (floor, not ceil): rounding up
+    # would make n exceed len(y) for clips shorter than 65536 samples (~1.4 s),
+    # so y[:n] and np.hanning(n) would mismatch and raise. Benchmark tracks are
+    # far longer than 65536 samples, so their window (and slope) is unchanged.
+    n = 1 << int(np.floor(np.log2(min(len(y), 65536))))
     if n < 1024:
         return {"beta": None, "band_lo_hz": None, "band_hi_hz": None}
     seg = y[:n] * np.hanning(n)
@@ -260,13 +268,24 @@ def hnr_db(y: np.ndarray, fs: int,
 
 # ---------- Psychoacoustics (mosqito) ----------
 
-def psychoacoustics(y: np.ndarray, fs: int) -> dict:
-    """Compute roughness (asper) and sharpness (acum) using mosqito."""
+def psychoacoustics(y: np.ndarray, fs: int, suppress_warnings: bool = False) -> dict:
+    """Compute roughness (asper) and sharpness (acum) using mosqito.
+
+    mosqito prints a ``[Warning] Signal resampled to 48 kHz ...`` line to stdout
+    whenever ``fs`` is not 48 kHz. Pass ``suppress_warnings=True`` to redirect
+    that stdout chatter into a throwaway buffer so batch runs stay quiet.
+    """
     out = {"roughness_asper": None, "sharpness_acum": None,
            "roughness_coverage_pct": None}
+
+    def _quiet():
+        return (contextlib.redirect_stdout(io.StringIO())
+                if suppress_warnings else contextlib.nullcontext())
+
     try:
         from mosqito.sq_metrics import roughness_dw
-        R, _, _, _ = roughness_dw(y, fs, overlap=0.5)
+        with _quiet():
+            R, _, _, _ = roughness_dw(y, fs, overlap=0.5)
         R = np.asarray(R, dtype=float)
         out["roughness_asper"] = float(np.nanmean(R))
         # Temporal coverage: share of the duration whose instantaneous
@@ -280,7 +299,8 @@ def psychoacoustics(y: np.ndarray, fs: int) -> dict:
         out["_roughness_err"] = str(e)
     try:
         from mosqito.sq_metrics import sharpness_din_st
-        S = sharpness_din_st(y, fs, weighting="din")
+        with _quiet():
+            S = sharpness_din_st(y, fs, weighting="din")
         out["sharpness_acum"] = float(np.nanmean(S))
     except Exception as e:
         out["_sharpness_err"] = str(e)
@@ -328,6 +348,19 @@ class Result:
     analysis_mode: str = "full"
     notes: str = ""
 
+    def to_dict(self) -> dict:
+        """Return every reporting parameter and metadata field as a plain dict."""
+        return asdict(self)
+
+    def to_json(self, *, indent: Optional[int] = 2) -> str:
+        """Serialise the full Result to a JSON string.
+
+        Round-trips through :meth:`to_dict`: ``json.loads(r.to_json())`` equals
+        ``r.to_dict()``, and ``Result(**r.to_dict())`` reconstructs an equal
+        Result. ``indent=None`` yields a compact single-line encoding.
+        """
+        return json.dumps(asdict(self), indent=indent, ensure_ascii=False)
+
 
 # --- Long-file handling -------------------------------------------------------
 # mosqito's roughness runs at ~1.7x real time and an 8 h file would not fit in
@@ -360,15 +393,30 @@ _NDIG = {
 def _result_from_signal(y: np.ndarray, fs: int, file: str, duration_s: float,
                         lyrics: str, delivery: str,
                         calibration_offset_db: float = 0.0,
-                        extra_note: str = "", analysis_mode: str = "full") -> Result:
+                        extra_note: str = "", analysis_mode: str = "full",
+                        suppress_warnings: bool = False) -> Result:
     """Compute a full Result from an in-memory mono signal."""
     import librosa  # lazy
 
     laeq = laeq_dbfs(y, fs) + calibration_offset_db
     drange = dynamic_range_db(y, fs)
-    peak = float(np.max(np.abs(y)))
+    peak = float(np.max(np.abs(y))) if y.size else 0.0
     rms = float(np.sqrt(np.mean(y * y)) + 1e-20)
     crest_db = float(20.0 * np.log10(peak / rms)) if peak > 0 else None
+
+    # Clip detection: samples at digital full scale mean the source clipped on
+    # capture, which distorts every level and spectral metric. Warn once (unless
+    # suppressed) and annotate the Result so downstream reports can flag it.
+    n_clip = int(np.count_nonzero(np.abs(y) >= 0.999)) if y.size else 0
+    clipped = peak >= 0.999 and n_clip > 0
+    if clipped and not suppress_warnings:
+        warnings.warn(
+            f"input appears to clip: {n_clip} sample(s) at digital full scale "
+            f"(|amplitude| >= 0.999) in {file}; level and spectral metrics may "
+            f"be distorted.",
+            UserWarning, stacklevel=2,
+        )
+
     att = attack_times_ms(y, fs, librosa)
     bpm = tempo_bpm(y, fs, librosa)
     mod = modulation_peak_hz(y, fs)
@@ -376,11 +424,13 @@ def _result_from_signal(y: np.ndarray, fs: int, file: str, duration_s: float,
     sl = spectral_slope(y, fs)
     flat = spectral_flatness(y, librosa)
     hnr = hnr_db(y, fs)
-    psy = psychoacoustics(y, fs)
+    psy = psychoacoustics(y, fs, suppress_warnings=suppress_warnings)
 
     notes = []
     if calibration_offset_db == 0.0:
         notes.append("LAeq in dBFS-A (uncalibrated)")
+    if clipped:
+        notes.append(f"clipping: {n_clip} full-scale sample(s)")
     for k in ("_roughness_err", "_sharpness_err"):
         if psy.get(k):
             notes.append(f"{k.strip('_')}: {psy[k]}")
@@ -521,7 +571,8 @@ def _aggregate_probes(results: list, file: str, duration_s: float, fs: int,
 
 
 def analyse(path: str, lyrics: str = "unknown", delivery: str = "unknown",
-            calibration_offset_db: float = 0.0) -> Result:
+            calibration_offset_db: float = 0.0,
+            suppress_warnings: bool = False) -> Result:
     info = sf.info(path)
     fs = int(info.samplerate)
     total = int(info.frames)
@@ -535,7 +586,8 @@ def analyse(path: str, lyrics: str = "unknown", delivery: str = "unknown",
         y = y.astype(np.float64)
         return _result_from_signal(y, fs2, os.path.basename(path),
                                    round(len(y) / fs2, 3),
-                                   lyrics, delivery, calibration_offset_db)
+                                   lyrics, delivery, calibration_offset_db,
+                                   suppress_warnings=suppress_warnings)
 
     # Long files: evenly spaced short probes spanning the whole recording.
     probe_frames = int(PROBE_S * fs)
@@ -567,10 +619,12 @@ def analyse(path: str, lyrics: str = "unknown", delivery: str = "unknown",
                 f"(format does not support seeking for probe-based analysis)")
         return _result_from_signal(y, fs2, os.path.basename(path), round(dur, 3),
                                    lyrics, delivery, calibration_offset_db,
-                                   extra_note=note, analysis_mode="truncated")
+                                   extra_note=note, analysis_mode="truncated",
+                                   suppress_warnings=suppress_warnings)
 
     results = [_result_from_signal(p, fs, "probe", round(len(p) / fs, 3),
-                                   lyrics, delivery, calibration_offset_db)
+                                   lyrics, delivery, calibration_offset_db,
+                                   suppress_warnings=suppress_warnings)
                for p in probes]
     # Level metrics (esp. dynamic range) cannot be recovered from short probes,
     # so compute them exactly over the whole file by streaming.
@@ -634,13 +688,29 @@ def write_csv(results: list[Result], csv_path: str) -> None:
 def analyze_audio(audio_file: str,
                   delivery_method: str = "unknown",
                   lyrics_presence: Optional[str] = None,
-                  calibration_offset_db: float = 0.0) -> Result:
+                  calibration_offset_db: float = 0.0,
+                  suppress_warnings: bool = False) -> Result:
     """Canonical entry point for programmatic use.
-    `lyrics_presence` may be 'yes', 'no', None, or 'unknown'."""
+
+    Parameters
+    ----------
+    audio_file:
+        Path to a WAV/FLAC/OGG file readable by ``soundfile``.
+    delivery_method:
+        Free-text delivery descriptor recorded on the Result.
+    lyrics_presence:
+        ``'yes'``, ``'no'``, ``None`` or ``'unknown'`` (anything else → ``'unknown'``).
+    calibration_offset_db:
+        dB offset added to LAeq for SPL calibration (default 0 → dBFS-A).
+    suppress_warnings:
+        When ``True``, silence mosqito's ``resampled to 48 kHz`` stdout notice
+        and the full-scale clipping warning — useful for quiet batch runs.
+    """
     lyrics = lyrics_presence if lyrics_presence in ("yes", "no") else "unknown"
     return analyse(audio_file, lyrics=lyrics,
                    delivery=delivery_method or "unknown",
-                   calibration_offset_db=calibration_offset_db)
+                   calibration_offset_db=calibration_offset_db,
+                   suppress_warnings=suppress_warnings)
 
 
 # ---------- Three-tier framework (paper Sections 3-4) ----------
@@ -1107,6 +1177,8 @@ def main() -> int:
                     help="Item #10 — delivery method (e.g. 'headphones', 'free-field', 'binaural', 'bone-conduction')")
     ap.add_argument("--calibration-offset-db", type=float, default=0.0,
                     help="Add this dB offset to LAeq for SPL calibration (default 0 — output in dBFS-A)")
+    ap.add_argument("--suppress-warnings", action="store_true",
+                    help="Silence mosqito's 'resampled to 48 kHz' notice and the full-scale clipping warning")
     args = ap.parse_args()
 
     results = []
@@ -1119,7 +1191,8 @@ def main() -> int:
         print(f"=== {p} ===")
         try:
             r = analyse(p, lyrics=args.lyrics, delivery=args.delivery,
-                        calibration_offset_db=args.calibration_offset_db)
+                        calibration_offset_db=args.calibration_offset_db,
+                        suppress_warnings=args.suppress_warnings)
         except Exception as e:
             print(f"  ERROR: {e}", file=sys.stderr)
             continue
@@ -1134,7 +1207,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-
-# 2026-07-08 :: core-typing :: refactor(core): tighten type hints on the public analyze_audio() signature
-
-# 2026-07-08 :: warnings-suppress-flag :: feat(core): add `suppress_warnings=True` option to silence the mosqito resample warning
