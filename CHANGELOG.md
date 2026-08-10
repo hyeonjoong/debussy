@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] — 2026-08-10
+
+### Changed
+- **Terminology aligned with the companion review.** The project described
+  itself throughout as computing "twelve reporting parameters", which conflated
+  two distinct things in the parent manuscript: its **Table 1** evaluates
+  *twelve* acoustic parameters and scores them into three tiers, while its
+  **Table 2** proposes an *eleven-item* minimum reporting guideline. DEBUSSY
+  implements Table 2. README, the documentation site, package metadata, the
+  CLI help text and the module docstrings now say so, and each artifact spells
+  out that the two lists are different.
+- **`docs/reference_ranges.md` rewritten against Table 1.** The previous version
+  put spectral slope, tempo and modulation rate in Tier 3 and named only two
+  Tier-2 parameters. Tiers, composite evidence scores and design strategies now
+  match the review, including the two boundary cases (predictability enters
+  Tier 1 at 9 points; tempo scores 10 but is held in Tier 2 because training and
+  culture modulate the tempo–arousal relationship).
+- **API reference pages written.** All six were placeholder stubs reading
+  "Stub created …, will be expanded" — visible on the published site since the
+  docs deployment landed. Each family page now documents its functions, units,
+  fixed internal choices, when a value is legitimately `None`, and which
+  reporting item it serves.
+
+### Fixed
+- Removed a leftover generated comment stamp from `docs/api/index.md`.
+
 ## [0.2.1] — 2026-08-10
 
 First release published to PyPI.
@@ -15,7 +41,7 @@ First release published to PyPI.
 - **Roughness and sharpness silently returned `None` on a clean install.**
   `mosqito` imports `matplotlib` inside `roughness_dw` and `sharpness_din_st`
   but does not declare it as a dependency, so an environment without matplotlib
-  lost both psychoacoustic parameters — two of the twelve reporting parameters —
+  lost both psychoacoustic parameters — two of the eleven reporting items —
   with the failure recorded only in `Result.notes` and no error raised. It went
   unnoticed because development environments happened to have matplotlib
   installed. `matplotlib` is now a required dependency, and a regression test
@@ -106,7 +132,7 @@ First release published to PyPI.
 ### Added
 - Initial library release split from the Hugging Face Space demo.
 - `analyze_audio()` single-call entry point returning the `Result` dataclass
-  with the twelve reporting parameters defined in the companion paper.
+  with the reporting items defined in the companion paper.
 - Family submodules: `debussy.level`, `debussy.envelope`, `debussy.spectral`,
   `debussy.tonal`, `debussy.psychoacoustic`.
 - Tier-1 / Tier-2 / Tier-3 framework helpers (`tier1_items`, `tier2_items`,
@@ -128,7 +154,8 @@ First release published to PyPI.
   with no autocorrelation peak above the voicing gate, so HNR is undefined.
   No failures, no out-of-range values.
 
-[Unreleased]: https://github.com/hyeonjoong/debussy/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/hyeonjoong/debussy/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/hyeonjoong/debussy/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/hyeonjoong/debussy/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/hyeonjoong/debussy/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/hyeonjoong/debussy/releases/tag/v0.1.0
