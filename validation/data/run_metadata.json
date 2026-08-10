@@ -1,0 +1,12 @@
+{
+  "run_date": "2026-05-27 13:37:04",
+  "n_total": 60,
+  "n_categories": {
+    "A2 DEAM low": 10,
+    "B1 DEAM mid-high": 15,
+    "B2 FMA medium": 15,
+    "C1 BELL-001": 20
+  },
+  "BELL_processing_minutes": 1.05,
+  "debussy_source": "huggingface.co/spaces/jjjooong/debussy"
+}
