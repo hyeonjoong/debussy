@@ -41,7 +41,7 @@ def test_psychoacoustic_backend_is_functional(am_tone):
     unnoticed. mosqito imports matplotlib inside roughness_dw and
     sharpness_din_st without declaring it, so a clean install missing matplotlib
     returned None for both parameters with no error surfaced to the caller,
-    silently dropping two of the twelve reporting parameters.
+    silently dropping two of the eleven reporting items.
 
     On a strongly modulated tone at mosqito's native rate there is no legitimate
     reason for either value to be undefined, so None here means the backend is

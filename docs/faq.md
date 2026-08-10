@@ -2,7 +2,7 @@
 
 ## What does DEBUSSY compute?
 
-Twelve reporting parameters for autonomic-arousal stimulus preparation: A-weighted
+The eleven-item minimum reporting guideline for autonomic-arousal stimuli: A-weighted
 level (LAeq, dBFS-A), dynamic range, crest factor, onset attack times, roughness
 (asper), tempo / amplitude-modulation rate, spectral centroid, sharpness (acum),
 spectral slope, harmonics-to-noise ratio, spectral flatness, plus the two

@@ -2,7 +2,7 @@
 """
 DEBUSSY — Descriptive Evidence-Based aUditory Stimulus SurveY
 
-Computes the 12-item acoustic reporting parameters proposed in the BELL
+Computes the 11-item minimum acoustic reporting guideline proposed in the BELL
 Therapeutics sound paper (Kim, Ha, Park, Thayer, Bosi, Eerola — Table 2 of
 the manuscript "Acoustic Parameters and Norms for Autonomic Arousal
 Modulation").
@@ -1178,7 +1178,7 @@ def plot_tier_compliance(r: Result):
 
 def main() -> int:
     ap = argparse.ArgumentParser(
-        description="Compute 12-item acoustic reporting parameters for audio file(s).")
+        description="Compute the 11-item minimum acoustic reporting guideline for audio file(s).")
     ap.add_argument("files", nargs="+", help="Audio file(s) (wav/flac/mp3 — anything soundfile/librosa can read)")
     ap.add_argument("--csv", help="Append results to this CSV file (created if missing)")
     ap.add_argument("--lyrics", choices=["yes", "no", "unknown"], default="unknown",
