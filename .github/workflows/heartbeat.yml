@@ -1,12 +1,13 @@
 name: commit-heartbeat
 
-# Laptop-independent dead-man's switch for the JOSS 6-month activity history.
-# The local launchd auto-commit can silently die (machine asleep, macOS TCC
-# blocking log files, a moved script — all observed in practice). This workflow
-# runs on GitHub's own infrastructure, so it keeps watching even when the laptop
-# is off: if no commit has landed in the last STALE_DAYS days it fails the run,
-# and GitHub emails the repository owner. It never commits anything itself —
-# self-committing would mask a dead local automation.
+# Dead-man's switch for the public development record. If no commit has landed
+# in the last STALE_DAYS days the run fails and GitHub emails the repository
+# owner — a nudge that the project has gone quiet, not a pass/fail on the code.
+# It never commits anything itself; self-committing would defeat the purpose.
+#
+# The threshold is deliberately loose. It used to be a week, back when a
+# scheduled workflow pushed a queued change every few days; that drip has been
+# retired in favour of ordinary development, which is lumpier by nature.
 
 on:
   schedule:
@@ -20,7 +21,7 @@ jobs:
   heartbeat:
     runs-on: ubuntu-latest
     env:
-      STALE_DAYS: "7"     # plan weeks start on a Wed and can finish early, so gaps up to ~7d are normal; >7 = a real miss
+      STALE_DAYS: "30"    # natural development pace; the drip that forced a commit every <7d is retired
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -35,7 +36,7 @@ jobs:
           echo "Last commit: $(git log -1 --format='%ci  %s')"
           echo "Age: ${age_days} day(s); threshold: ${STALE_DAYS} day(s)."
           if [ "$age_days" -gt "${STALE_DAYS}" ]; then
-            echo "::error::DEBUSSY commit history has stalled (${age_days} days since the last commit). The cloud auto-commit workflow may be failing or disabled — check the 'auto-commit' workflow runs in the Actions tab; GitHub disables scheduled workflows after 60 days of no repo activity."
+            echo "::error::No commit in ${age_days} days. Nothing is broken — this is a reminder that the repository has gone quiet. Note GitHub disables scheduled workflows after 60 days of no repo activity, which would silence this check too."
             exit 1
           fi
           echo "OK — commit history is active."
