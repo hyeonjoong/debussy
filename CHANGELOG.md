@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-08-10
+
+First release published to PyPI.
+
+### Fixed
+- **Roughness and sharpness silently returned `None` on a clean install.**
+  `mosqito` imports `matplotlib` inside `roughness_dw` and `sharpness_din_st`
+  but does not declare it as a dependency, so an environment without matplotlib
+  lost both psychoacoustic parameters — two of the twelve reporting parameters —
+  with the failure recorded only in `Result.notes` and no error raised. It went
+  unnoticed because development environments happened to have matplotlib
+  installed. `matplotlib` is now a required dependency, and a regression test
+  asserts both parameters compute on a strongly modulated tone (the existing
+  psychoacoustic tests skip on `None`, so they could not catch this).
+- **`py.typed` was declared in `[tool.setuptools.package-data]` but absent from
+  the source tree**, so the marker never shipped and the annotated public API
+  provided no type information to consumers. The file now exists and is verified
+  present in both the wheel and the sdist.
+
+### Added
+- Publish-on-tag workflow using PyPI Trusted Publishing (OIDC), with a TestPyPI
+  dry-run path and a guard that refuses to publish when the git tag and the
+  packaged version disagree.
+
 ## [0.2.0] — 2026-08-10
 
 ### Added
@@ -104,6 +128,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with no autocorrelation peak above the voicing gate, so HNR is undefined.
   No failures, no out-of-range values.
 
-[Unreleased]: https://github.com/hyeonjoong/debussy/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/hyeonjoong/debussy/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/hyeonjoong/debussy/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/hyeonjoong/debussy/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/hyeonjoong/debussy/releases/tag/v0.1.0
