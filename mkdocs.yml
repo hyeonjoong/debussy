@@ -1,5 +1,6 @@
 site_name: DEBUSSY
-site_url: https://jjjooong.github.io/debussy
+site_url: https://hyeonjoong.github.io/debussy
+site_description: The eleven-item minimum acoustic reporting guideline for autonomic-arousal stimuli
 repo_url: https://github.com/hyeonjoong/debussy
 theme:
   name: material
@@ -8,13 +9,30 @@ theme:
     - content.code.copy
 plugins:
   - search
+markdown_extensions:
+  # Without `admonition` the !!! blocks used in the docs render as literal text.
+  - admonition
+  - attr_list
+  - tables
+  - pymdownx.details
+  - pymdownx.superfences
+  - toc:
+      permalink: true
 nav:
   - Home: index.md
+  - Installation: installation.md
   - Quickstart: quickstart.md
+  - Command line: cli.md
   - API:
-    - api/index.md
+    - Overview: api/index.md
+    - Level: api/level.md
+    - Envelope: api/envelope.md
+    - Spectral: api/spectral.md
+    - Tonal: api/tonal.md
+    - Psychoacoustic: api/psychoacoustic.md
   - Validation: validation.md
   - Reference ranges: reference_ranges.md
+  - Comparison with other tools: comparing_with_other_tools.md
   - FAQ: faq.md
   - Troubleshooting: troubleshooting.md
   - Changelog: changelog.md

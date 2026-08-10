@@ -7,7 +7,93 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] — 2026-08-10
+
+### Changed
+- **Terminology aligned with the companion review.** The project described
+  itself throughout as computing "twelve reporting parameters", which conflated
+  two distinct things in the parent manuscript: its **Table 1** evaluates
+  *twelve* acoustic parameters and scores them into three tiers, while its
+  **Table 2** proposes an *eleven-item* minimum reporting guideline. DEBUSSY
+  implements Table 2. README, the documentation site, package metadata, the
+  CLI help text and the module docstrings now say so, and each artifact spells
+  out that the two lists are different.
+- **`docs/reference_ranges.md` rewritten against Table 1.** The previous version
+  put spectral slope, tempo and modulation rate in Tier 3 and named only two
+  Tier-2 parameters. Tiers, composite evidence scores and design strategies now
+  match the review, including the two boundary cases (predictability enters
+  Tier 1 at 9 points; tempo scores 10 but is held in Tier 2 because training and
+  culture modulate the tempo–arousal relationship).
+- **API reference pages written.** All six were placeholder stubs reading
+  "Stub created …, will be expanded" — visible on the published site since the
+  docs deployment landed. Each family page now documents its functions, units,
+  fixed internal choices, when a value is legitimately `None`, and which
+  reporting item it serves.
+
+### Fixed
+- Removed a leftover generated comment stamp from `docs/api/index.md`.
+
+## [0.2.1] — 2026-08-10
+
+First release published to PyPI.
+
+### Fixed
+- **Roughness and sharpness silently returned `None` on a clean install.**
+  `mosqito` imports `matplotlib` inside `roughness_dw` and `sharpness_din_st`
+  but does not declare it as a dependency, so an environment without matplotlib
+  lost both psychoacoustic parameters — two of the eleven reporting items —
+  with the failure recorded only in `Result.notes` and no error raised. It went
+  unnoticed because development environments happened to have matplotlib
+  installed. `matplotlib` is now a required dependency, and a regression test
+  asserts both parameters compute on a strongly modulated tone (the existing
+  psychoacoustic tests skip on `None`, so they could not catch this).
+- **`py.typed` was declared in `[tool.setuptools.package-data]` but absent from
+  the source tree**, so the marker never shipped and the annotated public API
+  provided no type information to consumers. The file now exists and is verified
+  present in both the wheel and the sdist.
+
 ### Added
+- Publish-on-tag workflow using PyPI Trusted Publishing (OIDC), with a TestPyPI
+  dry-run path and a guard that refuses to publish when the git tag and the
+  packaged version disagree.
+
+## [0.2.0] — 2026-08-10
+
+### Added
+- **`suppress_warnings=True`** on `analyze_audio()` / `analyse()` and
+  `--suppress-warnings` on the CLI: silences the 48 kHz resample notice and the
+  full-scale clipping warning for quiet batch runs.
+- **`Result.to_dict()` and `Result.to_json()`** — lossless serialisation of every
+  reporting field; `json.loads(r.to_json())` round-trips back to an equal `Result`.
+- **Clipping detection**: a `UserWarning` and a `Result.notes` annotation when the
+  input contains samples at digital full scale, whose level and spectral metrics
+  are therefore suspect.
+- **Documentation site** at <https://hyeonjoong.github.io/debussy>, built with
+  mkdocs-material and deployed from CI; installation, CLI reference, per-family
+  API pages, validation, reference ranges, tool comparison, FAQ, troubleshooting.
+- **`validation/`** — the audio manifest, the raw per-track parameter matrix, the
+  summary statistics, and the two scripts that regenerate them, so every number
+  in the paper's validation section can be checked. `analyze_results.py` also
+  computes the Benjamini–Hochberg q-values the paper reports.
+- Runnable examples: `batch_report.py`, `csv_writer.py`, `json_export.py`.
+
+### Fixed
+- **`spectral_slope` crashed on clips shorter than ~1.4 s**: the FFT window was
+  rounded *up* to the next power of two, which could exceed the signal length.
+  It now rounds down. Values for the validation-benchmark tracks are unchanged.
+- The 48 kHz resample notice is now a DEBUSSY-owned `UserWarning` rather than a
+  read of mosqito's stdout, which some builds emit and others do not.
+
+### Changed
+- Test suite expanded from 22 to 56 tests, covering short clips, stereo downmix,
+  the resample path, calibration offset, empty-onset handling, serialisation,
+  clipping, the noise floor, import time, long-input probe mode, `write_csv`
+  round-trips and the CLI. Three placeholder tests that were skipped, and so
+  asserted nothing, were replaced with real ones.
+- The scheduled workflow that paced commits has been retired; the heartbeat
+  check remains with a 30-day threshold.
+
+### Added (0.1.x development)
 - **Temporal-coverage descriptors** (`Result.roughness_coverage_pct`,
   `Result.sharp_onset_pct`, `Result.sharp_onset_count`) and `coverage_items()` /
   `plot_coverage()`: the proportion of a stimulus that crosses each Tier-1
@@ -46,7 +132,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial library release split from the Hugging Face Space demo.
 - `analyze_audio()` single-call entry point returning the `Result` dataclass
-  with the twelve reporting parameters defined in the companion paper.
+  with the reporting items defined in the companion paper.
 - Family submodules: `debussy.level`, `debussy.envelope`, `debussy.spectral`,
   `debussy.tonal`, `debussy.psychoacoustic`.
 - Tier-1 / Tier-2 / Tier-3 framework helpers (`tier1_items`, `tier2_items`,
@@ -63,8 +149,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - B1 (DEAM mid-to-high arousal, *n*=15)
   - B2 (FMA medium, *n*=15, genre-stratified)
   - C1 (BELL-001 SleepThera, *n*=20, breath-paced biofeedback stimuli)
-- All sixty tracks produce twelve non-null parameters in physiologically
-  plausible range; no failures, no out-of-range values.
+- Fifty-eight of sixty tracks produce twelve non-null parameters in
+  physiologically plausible range; the two exceptions are ~10 s breath clips
+  with no autocorrelation peak above the voicing gate, so HNR is undefined.
+  No failures, no out-of-range values.
 
-[Unreleased]: https://github.com/hyeonjoong/debussy/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/hyeonjoong/debussy/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/hyeonjoong/debussy/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/hyeonjoong/debussy/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/hyeonjoong/debussy/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/hyeonjoong/debussy/releases/tag/v0.1.0

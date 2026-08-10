@@ -10,8 +10,55 @@ likewise the DIN 45692 sharpness integrator can return NaN/None on degenerate
 loudness spectra). We tolerate None and only assert ranges when a finite value
 is produced.
 """
+import numpy as np
 import pytest
+import soundfile as sf
+
 from debussy import analyze_audio
+
+FS = 48000  # mosqito's native rate, so no resampling is involved
+
+
+@pytest.fixture(scope="module")
+def am_tone(tmp_path_factory):
+    """300 Hz carrier, 70 Hz amplitude modulation — unambiguously rough.
+
+    Daniel-Weber roughness peaks near 70 Hz modulation, so this signal must
+    produce a finite roughness value on any working installation.
+    """
+    t = np.arange(int(FS * 3.0)) / FS
+    y = 0.4 * (1 + 0.5 * np.sin(2 * np.pi * 70 * t)) * np.sin(2 * np.pi * 300 * t)
+    path = tmp_path_factory.mktemp("psy") / "am_tone.wav"
+    sf.write(path, np.clip(y, -1, 1).astype(np.float32), FS, subtype="PCM_16")
+    return str(path)
+
+
+def test_psychoacoustic_backend_is_functional(am_tone):
+    """Regression guard: both psychoacoustic parameters must actually compute.
+
+    The other tests in this module skip when mosqito returns None, which is the
+    right call for adversarial inputs — but it also meant a broken backend went
+    unnoticed. mosqito imports matplotlib inside roughness_dw and
+    sharpness_din_st without declaring it, so a clean install missing matplotlib
+    returned None for both parameters with no error surfaced to the caller,
+    silently dropping two of the eleven reporting items.
+
+    On a strongly modulated tone at mosqito's native rate there is no legitimate
+    reason for either value to be undefined, so None here means the backend is
+    broken rather than the input being degenerate.
+    """
+    r = analyze_audio(am_tone)
+    assert "err" not in (r.notes or ""), f"psychoacoustic backend reported: {r.notes}"
+    assert r.roughness_asper is not None, (
+        "roughness is None on a 70 Hz AM tone — the mosqito backend is not working "
+        f"(notes: {r.notes!r})"
+    )
+    assert r.sharpness_acum is not None, (
+        "sharpness is None on a 70 Hz AM tone — the mosqito backend is not working "
+        f"(notes: {r.notes!r})"
+    )
+    assert r.roughness_asper > 0.0
+    assert r.sharpness_acum > 0.0
 
 
 def test_roughness_in_plausible_range(sine_440):
