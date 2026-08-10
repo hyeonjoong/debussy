@@ -6,7 +6,7 @@ statistics, and the two scripts that regenerate them.
 
 The point of the benchmark is **not** to make a substantive claim about music or
 breath stimuli — that is the role of the parent review. It is to show that every
-one of the twelve reporting parameters returns a sensible, bounded,
+one of the measured reporting items returns a sensible, bounded,
 finite-variance value across acoustically very different material, and that the
 parameters together separate categories when real acoustic differences exist.
 

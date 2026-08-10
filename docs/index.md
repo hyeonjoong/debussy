@@ -1,8 +1,9 @@
 # DEBUSSY
 
-**DEBUSSY** computes a fixed set of **twelve acoustic reporting parameters** from
-an audio stimulus in a single call, in output formats designed for reproducible
-psychophysiology and autonomic-arousal research.
+**DEBUSSY** implements the **eleven-item minimum acoustic reporting guideline**
+for autonomic-arousal stimuli — nine items measured from the audio in a single
+call, plus two recorded alongside them — in output formats designed for
+reproducible psychophysiology research.
 
 ```python
 from debussy import analyze_audio
@@ -25,8 +26,8 @@ studies.
 
 DEBUSSY fixes the choices, names them, and returns one schema:
 
-1. **One call, twelve parameters, one schema** — `analyze_audio()` returns a typed
-   `Result` dataclass ready to become a manuscript table row.
+1. **One call, one schema** — `analyze_audio()` returns a typed `Result`
+   dataclass ready to become a manuscript table row.
 2. **Standardised internals** — window lengths, A-weighting coefficients and the
    spectral-slope band are fixed and documented; deviating requires an explicit
    override, which leaves a record at the call site.
@@ -34,19 +35,35 @@ DEBUSSY fixes the choices, names them, and returns one schema:
    design check), Tier 2 (directional guideline) or Tier 3 (exploratory), which
    separates *"is this stimulus admissible?"* from *"what does it do?"*.
 
-## The twelve parameters
+## The eleven reporting items
 
-| Family | Parameters |
-|---|---|
-| Level | LAeq (dBFS-A), dynamic range (dB), crest factor (dB) |
-| Temporal envelope | attack time mean/median/SD (ms), tempo (BPM), modulation peak (Hz) |
-| Spectral shape | spectral centroid (Hz), spectral slope β |
-| Tonal | harmonics-to-noise ratio (dB), spectral flatness [0, 1] |
-| Psychoacoustic | roughness (asper), sharpness (acum) |
+Table 2 of the companion review — the minimum set proposed for the field.
+Nine are measured from the audio; lyrics presence and delivery method are
+recorded by the caller, since no analyser can determine them.
 
-Per-family details live under the API section, starting at
-[API overview](api/index.md). Thresholds and how each tier is graded are in
+| # | Item | Unit | Family |
+|---|---|---|---|
+| 1 | LAeq + dynamic range | dBFS-A, dB | [Level](api/level.md) |
+| 2 | Attack time distribution | ms | [Envelope](api/envelope.md) |
+| 3 | Roughness | asper | [Psychoacoustic](api/psychoacoustic.md) |
+| 4 | Tempo / modulation rate | BPM, Hz | [Envelope](api/envelope.md) |
+| 5 | Spectral centroid | Hz | [Spectral](api/spectral.md) |
+| 6 | Sharpness | acum | [Psychoacoustic](api/psychoacoustic.md) |
+| 7 | Spectral slope β | — | [Spectral](api/spectral.md) |
+| 8 | Harmonicity / HNR | dB | [Tonal](api/tonal.md) |
+| 9 | Lyrics presence | yes/no | *caller-supplied* |
+| 10 | Delivery method | categorical | *caller-supplied* |
+| 11 | Spectral flatness | [0, 1] | [Tonal](api/tonal.md) |
+
+`Result` also carries crest factor and temporal-coverage descriptors as
+diagnostics beyond the guideline. Per-family detail is in the
+[API overview](api/index.md); thresholds and tier grading are in
 [Reference ranges](reference_ranges.md).
+
+!!! note "Eleven items, twelve parameters — not the same list"
+    The companion review *evaluates* **twelve** acoustic parameters (its
+    Table 1) and separately *proposes* this **eleven-item** reporting guideline
+    (its Table 2). DEBUSSY implements the reporting guideline.
 
 ## Where to go next
 
