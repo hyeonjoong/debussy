@@ -1,0 +1,57 @@
+name: docs
+
+# Build the mkdocs-material site and publish it to GitHub Pages on every push to
+# main. The build runs with --strict so a broken link or a page missing from the
+# nav fails CI rather than silently shipping a broken site.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: debussy-docs
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install docs dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Pinned: MkDocs 2.0 removes the plugin system and breaks theme
+          # overrides with no migration path, so hold the 1.x/9.x line.
+          pip install "mkdocs-material>=9.7,<10" "mkdocs>=1.6,<2"
+      - name: Build site (strict)
+        run: mkdocs build --strict
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    # Only publish from main; pull requests just prove the site still builds.
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
