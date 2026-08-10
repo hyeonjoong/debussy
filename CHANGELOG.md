@@ -7,7 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-08-10
+
 ### Added
+- **`suppress_warnings=True`** on `analyze_audio()` / `analyse()` and
+  `--suppress-warnings` on the CLI: silences the 48 kHz resample notice and the
+  full-scale clipping warning for quiet batch runs.
+- **`Result.to_dict()` and `Result.to_json()`** — lossless serialisation of every
+  reporting field; `json.loads(r.to_json())` round-trips back to an equal `Result`.
+- **Clipping detection**: a `UserWarning` and a `Result.notes` annotation when the
+  input contains samples at digital full scale, whose level and spectral metrics
+  are therefore suspect.
+- **Documentation site** at <https://hyeonjoong.github.io/debussy>, built with
+  mkdocs-material and deployed from CI; installation, CLI reference, per-family
+  API pages, validation, reference ranges, tool comparison, FAQ, troubleshooting.
+- **`validation/`** — the audio manifest, the raw per-track parameter matrix, the
+  summary statistics, and the two scripts that regenerate them, so every number
+  in the paper's validation section can be checked. `analyze_results.py` also
+  computes the Benjamini–Hochberg q-values the paper reports.
+- Runnable examples: `batch_report.py`, `csv_writer.py`, `json_export.py`.
+
+### Fixed
+- **`spectral_slope` crashed on clips shorter than ~1.4 s**: the FFT window was
+  rounded *up* to the next power of two, which could exceed the signal length.
+  It now rounds down. Values for the validation-benchmark tracks are unchanged.
+- The 48 kHz resample notice is now a DEBUSSY-owned `UserWarning` rather than a
+  read of mosqito's stdout, which some builds emit and others do not.
+
+### Changed
+- Test suite expanded from 22 to 56 tests, covering short clips, stereo downmix,
+  the resample path, calibration offset, empty-onset handling, serialisation,
+  clipping, the noise floor, import time, long-input probe mode, `write_csv`
+  round-trips and the CLI. Three placeholder tests that were skipped, and so
+  asserted nothing, were replaced with real ones.
+- The scheduled workflow that paced commits has been retired; the heartbeat
+  check remains with a 30-day threshold.
+
+### Added (0.1.x development)
 - **Temporal-coverage descriptors** (`Result.roughness_coverage_pct`,
   `Result.sharp_onset_pct`, `Result.sharp_onset_count`) and `coverage_items()` /
   `plot_coverage()`: the proportion of a stimulus that crosses each Tier-1
@@ -63,8 +99,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - B1 (DEAM mid-to-high arousal, *n*=15)
   - B2 (FMA medium, *n*=15, genre-stratified)
   - C1 (BELL-001 SleepThera, *n*=20, breath-paced biofeedback stimuli)
-- All sixty tracks produce twelve non-null parameters in physiologically
-  plausible range; no failures, no out-of-range values.
+- Fifty-eight of sixty tracks produce twelve non-null parameters in
+  physiologically plausible range; the two exceptions are ~10 s breath clips
+  with no autocorrelation peak above the voicing gate, so HNR is undefined.
+  No failures, no out-of-range values.
 
-[Unreleased]: https://github.com/hyeonjoong/debussy/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/hyeonjoong/debussy/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/hyeonjoong/debussy/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/hyeonjoong/debussy/releases/tag/v0.1.0

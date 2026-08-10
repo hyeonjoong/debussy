@@ -97,12 +97,15 @@ DEBUSSY has been validated on a **60-track open-dataset + clinical benchmark**:
 - **B2 (FMA medium)** *n*=15 (genre-stratified)
 - **C1 (BELL-001 SleepThera)** *n*=20 (breath-paced biofeedback stimuli)
 
-All sixty tracks produce twelve non-null parameters within physiologically
-plausible ranges. See `paper/` for the JOSS methods paper, including
-distribution figures and effect-size analysis.
+Fifty-eight of the sixty tracks produce twelve non-null parameters within
+physiologically plausible ranges; the two exceptions are ~10 s breath clips with
+no autocorrelation peak above the voicing gate, so HNR is undefined for them.
+See `paper/` for the JOSS paper, including distribution figures and effect-size
+analysis.
 
-Validation data and scripts are released alongside the paper for full
-reproducibility.
+The manifest, the raw per-track parameter matrix and the scripts that regenerate
+both live in [`validation/`](validation/) — `analyze_results.py` runs on the
+published matrix with no audio required.
 
 ## Citation
 
