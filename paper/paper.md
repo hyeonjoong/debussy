@@ -12,6 +12,9 @@ authors:
     orcid: 0000-0002-2898-0464
     corresponding: true
     affiliation: 1
+  - name: Jonghwa Jeonglok Park
+    orcid: 0000-0002-0097-5196
+    affiliation: 1
   - name: Kyurim Kang
     orcid: 0000-0001-8061-4456
     affiliation: 2
