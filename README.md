@@ -6,10 +6,10 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![HuggingFace Demo](https://img.shields.io/badge/🤗-Try%20on%20HF%20Spaces-yellow)](https://huggingface.co/spaces/jjjooong/debussy)
 
-> **DEBUSSY** is a Python toolbox that computes a fixed set of **twelve acoustic
-> reporting parameters** from an audio stimulus, in a single call, with output
-> formats designed for **reproducible psychophysiology and autonomic-arousal
-> research**.
+> **DEBUSSY** implements the **eleven-item minimum acoustic reporting
+> guideline** for autonomic-arousal stimuli — nine items measured from the audio
+> in a single call, plus two recorded alongside them — with output formats
+> designed for **reproducible psychophysiology research**.
 
 ## Statement of need
 
@@ -26,30 +26,42 @@ detector, mosqito version).
 
 DEBUSSY closes this gap with three design choices:
 
-1. **One call, twelve parameters, one schema.** A single `analyze_audio()`
-   returns a dataclass with the twelve parameters in the order and units of the
-   reporting table used in our companion review paper.
+1. **One call, one schema.** A single `analyze_audio()` returns a dataclass
+   carrying the eleven reporting items in the order and units of Table 2 of our
+   companion review, so a row can go straight into a manuscript table.
 2. **Standardised internals.** Window lengths, A-weighting filter coefficients,
    and the spectral-slope band are fixed and documented.
 3. **Tier-1 / Tier-2 / Tier-3 evaluation built in.** Each parameter is tagged
    with a tier indicating whether it is a universal design check, a directional
    guideline, or an exploratory descriptor.
 
-## The twelve parameters
+## The eleven reporting items
 
-| # | Parameter | Unit | Family |
+These are Table 2 of the companion review — the minimum set proposed for the
+field. Items 1–8 and 11 are measured from the audio; 9 and 10 are recorded by
+the caller, since no analyser can determine them.
+
+| # | Item | Unit | `Result` field(s) |
 |---|---|---|---|
-| 1 | LAeq | dBFS-A | Level |
-| 2 | Dynamic range | dB | Level |
-| 3 | Crest factor | dB | Level |
-| 4 | Attack time (mean, median, SD) | ms | Temporal envelope |
-| 5 | Tempo | BPM | Temporal envelope |
-| 6 | Modulation peak | Hz | Temporal envelope |
-| 7 | Spectral centroid | Hz | Spectral shape |
-| 8 | Spectral slope β | — | Spectral shape |
-| 9 | HNR | dB | Tonal |
-| 10 | Spectral flatness | [0, 1] | Tonal |
-| 11 | Roughness, sharpness | asper, acum | Psychoacoustic |
+| 1 | LAeq + dynamic range | dBFS-A, dB | `laeq_dbfs_a`, `dynamic_range_db` |
+| 2 | Attack time distribution | ms | `attack_mean_ms`, `attack_median_ms`, `attack_sd_ms` |
+| 3 | Roughness | asper | `roughness_asper` |
+| 4 | Tempo / modulation rate | BPM, Hz | `tempo_bpm`, `modulation_peak_hz` |
+| 5 | Spectral centroid | Hz | `spectral_centroid_hz` |
+| 6 | Sharpness | acum | `sharpness_acum` |
+| 7 | Spectral slope β | — | `spectral_slope_beta` |
+| 8 | Harmonicity / HNR | dB | `hnr_db` |
+| 9 | Lyrics presence | yes/no | `lyrics` *(caller-supplied)* |
+| 10 | Delivery method | categorical | `delivery` *(caller-supplied)* |
+| 11 | Spectral flatness | [0, 1] | `spectral_flatness` |
+
+`Result` additionally carries crest factor and temporal-coverage descriptors as
+diagnostics beyond the guideline.
+
+> **Note on counts.** The companion review evaluates **twelve** acoustic
+> parameters (its Table 1) and, separately, proposes this **eleven-item**
+> reporting guideline (its Table 2). The two lists are not the same thing:
+> DEBUSSY implements the reporting guideline.
 
 ## Install
 
@@ -97,9 +109,10 @@ DEBUSSY has been validated on a **60-track open-dataset + clinical benchmark**:
 - **B2 (FMA medium)** *n*=15 (genre-stratified)
 - **C1 (BELL-001 SleepThera)** *n*=20 (breath-paced biofeedback stimuli)
 
-Fifty-eight of the sixty tracks produce twelve non-null parameters within
-physiologically plausible ranges; the two exceptions are ~10 s breath clips with
-no autocorrelation peak above the voicing gate, so HNR is undefined for them.
+Fifty-eight of the sixty tracks produce a complete, non-null set of measured
+values within physiologically plausible ranges; the two exceptions are ~10 s
+breath clips with no autocorrelation peak above the voicing gate, so HNR is
+undefined for them.
 See `paper/` for the JOSS paper, including distribution figures and effect-size
 analysis.
 
@@ -113,7 +126,7 @@ If you use DEBUSSY in your research, please cite:
 
 ```bibtex
 @article{Kim2026,
-  title   = {DEBUSSY: A Python toolbox for 12-parameter acoustic reporting of audio stimuli used in autonomic-arousal research},
+  title   = {DEBUSSY: A Python toolbox for the eleven-item minimum acoustic reporting guideline for autonomic-arousal stimuli},
   author  = {Kim, Hyeon-Joong and others},
   year    = {2026},
   journal = {Journal of Open Source Software},

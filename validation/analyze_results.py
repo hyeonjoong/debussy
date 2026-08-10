@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Summarise the benchmark parameter matrix and reproduce the distribution figure.
 
-For each of the twelve reporting parameters this computes, across the three
+For each of the twelve measured quantities this computes, across the three
 benchmark categories:
 
 * medians and group sizes,
@@ -135,7 +135,7 @@ def make_figure(groups, out_base: Path) -> None:
         ax.grid(axis="y", alpha=0.3, linestyle=":")
 
     fig.suptitle(
-        "DEBUSSY twelve-parameter distributions on the 60-track benchmark\n"
+        "DEBUSSY reporting-parameter distributions on the 60-track benchmark\n"
         "A - Relaxation (DEAM low-arousal) | B - Frequently listened (DEAM mid-high + FMA-medium) "
         "| C - BELL-001 SleepThera (green diamonds)",
         fontsize=10.5, y=0.997)

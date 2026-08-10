@@ -1,4 +1,4 @@
-"""DEBUSSY — 12-parameter acoustic reporting for autonomic-arousal stimulus preparation.
+"""DEBUSSY — the eleven-item minimum acoustic reporting guideline for autonomic-arousal stimuli.
 
 Public API:
 
@@ -7,7 +7,7 @@ Public API:
     >>> result.laeq_dbfs_a
     -17.89
 
-The :class:`Result` dataclass exposes all 12 reporting parameters plus run
+The :class:`Result` dataclass exposes all eleven reporting items plus run
 metadata, and additive temporal-coverage descriptors
 (``roughness_coverage_pct``, ``sharp_onset_pct``) reporting the proportion of
 the stimulus that crosses each Tier-1 threshold — so a long clip that is calm
@@ -37,7 +37,7 @@ from ._core import (
     plot_coverage,
 )
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 __all__ = [
     "analyze_audio",
     "analyse",

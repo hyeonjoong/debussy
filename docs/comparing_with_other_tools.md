@@ -23,7 +23,7 @@ framework and length-aware coverage descriptors on top.
   over framing, or features DEBUSSY does not report.
 - **mosqito** — you need the psychoacoustic metrics on their own, or other Sottek
   /Zwicker quantities DEBUSSY does not surface.
-- **DEBUSSY** — you want the specific 12-parameter arousal report, the
+- **DEBUSSY** — you want the specific eleven-item arousal report, the
   pass/fail/guidance tiers, and coverage descriptors in one call, reproducible
   across a stimulus set.
 
