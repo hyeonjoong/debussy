@@ -1,0 +1,61 @@
+Track_ID,Subcategory,Source_ID,Original_duration_s,Output_duration_s,Output_file,Output_size_KB,Artist,Title,Genre
+A011,A2 — DEAM low-arousal,631,45.1,45.1,A011_DEAM631.wav,3881,WWIII,Lansdowne,Jazz
+A012,A2 — DEAM low-arousal,702,45.1,45.1,A012_DEAM702.wav,3881,WWIII,Shipyard,Jazz
+A013,A2 — DEAM low-arousal,962,45.1,45.1,A013_DEAM962.wav,3881,Ice Age,Rotting Heights,Rock
+A014,A2 — DEAM low-arousal,893,45.0,45.0,A014_DEAM893.wav,3879,Tyrannic Toy,Blackroad,Rock
+A015,A2 — DEAM low-arousal,902,45.1,45.1,A015_DEAM902.wav,3881,Arrogalla remixes Dadub,Naramiddu poita (feat,Rock
+A016,A2 — DEAM low-arousal,253,45.1,45.1,A016_DEAM253.wav,3881,The Rope River Blues Band,Dance!,Country
+A017,A2 — DEAM low-arousal,617,45.1,45.1,A017_DEAM617.wav,3881,The Peach Tree,A Clean Slate,Folk
+A018,A2 — DEAM low-arousal,939,45.1,45.1,A018_DEAM939.wav,3881,Richard There,You should go on,Rock
+A019,A2 — DEAM low-arousal,456,45.1,45.1,A019_DEAM456.wav,3881,Stickfigure,Crack in Time,Electronic
+A020,A2 — DEAM low-arousal,104,45.1,45.1,A020_DEAM104.wav,3881,The Rope River Blues Band,Ben Jonson's Blues,Blues
+B001,B1 — DEAM mid-high arousal,115,45.1,45.1,B001_DEAM115.wav,3881,Barrence Whitfield and The Savages,Bip Bop Bip,Blues
+B002,B1 — DEAM mid-high arousal,189,45.0,45.0,B002_DEAM189.wav,3879,Sláinte,Wild Rover with Bellevue Chamber Chorus,Classical
+B003,B1 — DEAM mid-high arousal,322,45.1,45.1,B003_DEAM322.wav,3881,Pee Wee King,I Wanna Say Hello,Country
+B004,B1 — DEAM mid-high arousal,405,45.1,45.1,B004_DEAM405.wav,3881,Kevin MacLeod,Presenterator,Electronic
+B005,B1 — DEAM mid-high arousal,561,45.0,45.0,B005_DEAM561.wav,3879,La Minor,La Minor Live at Pacific Parc Vol,Folk
+B006,B1 — DEAM mid-high arousal,640,45.1,45.1,B006_DEAM640.wav,3881,Los Sundayers,¡Qué Paciencia!,Jazz
+B007,B1 — DEAM mid-high arousal,764,45.1,45.1,B007_DEAM764.wav,3881,Sleeping Policemen,Vogelbird,Pop
+B008,B1 — DEAM mid-high arousal,2011,627.2,45.0,B008_DEAM2011.wav,3876,Lushlife,Toynbee Suite,Rap
+B009,B1 — DEAM mid-high arousal,960,45.0,45.0,B009_DEAM960.wav,3880,Anamanaguchi,Helix Nebula,Rock
+B010,B1 — DEAM mid-high arousal,2002,130.2,45.0,B010_DEAM2002.wav,3876,Amar Lal,Spring Day 1,Singer/Songwriter
+B011,B1 — DEAM mid-high arousal,2019,180.5,45.0,B011_DEAM2019.wav,3876,Phoenix,The Broken Pledge - Chicago Reel,World/Folk
+B012,B1 — DEAM mid-high arousal,86,45.1,45.1,B012_DEAM86.wav,3881,Eat at Joe's,Eat at Joe's,Blues
+B013,B1 — DEAM mid-high arousal,177,45.1,45.1,B013_DEAM177.wav,3881,IKOS David Clifton with the choirs of Peterborough Cathedral,O Come O Come Emmanuel,Classical
+B014,B1 — DEAM mid-high arousal,265,45.1,45.1,B014_DEAM265.wav,3881,George P. Watson,Emmet's Cuckoo Song,Country
+B015,B1 — DEAM mid-high arousal,455,45.1,45.1,B015_DEAM455.wav,3881,Music For Your Plants,Expedition Chant Cup,Electronic
+B016,B2 — FMA medium,55718,30.0,30.0,B016_FMA055718.wav,2584,et_,Kopeika,Rock
+B017,B2 — FMA medium,86761,30.0,30.0,B017_FMA086761.wav,2584,Marco Trovatello,Be Sweet,Rock
+B018,B2 — FMA medium,54033,30.0,30.0,B018_FMA054033.wav,2582,alright lover,Snow Wave,Pop
+B019,B2 — FMA medium,62751,30.0,30.0,B019_FMA062751.wav,2582,Jahzzar,Birthday Cake,Pop
+B020,B2 — FMA medium,24425,30.0,30.0,B020_FMA024425.wav,2584,Black Ant,Fater Lee,Hip-Hop
+B021,B2 — FMA medium,22295,30.0,30.0,B021_FMA022295.wav,2584,Comfort Fit,Sorry,Hip-Hop
+B022,B2 — FMA medium,42377,30.0,30.0,B022_FMA042377.wav,2582,Broke For Free,Night Owl,Electronic
+B023,B2 — FMA medium,69170,30.0,30.0,B023_FMA069170.wav,2584,Tours,Enthusiast,Electronic
+B024,B2 — FMA medium,23014,30.0,30.0,B024_FMA023014.wav,2584,Robin Grey,These Days,Folk
+B025,B2 — FMA medium,23371,30.0,30.0,B025_FMA023371.wav,2584,Josh Woodward,I Want To Destroy Something Beautiful,Folk
+B026,B2 — FMA medium,12672,30.0,30.0,B026_FMA012672.wav,2582,Latché Swing,Hungaria,Jazz
+B027,B2 — FMA medium,22332,30.0,30.0,B027_FMA022332.wav,2582,Kriss,Jazz Club,Jazz
+B028,B2 — FMA medium,73760,30.0,30.0,B028_FMA073760.wav,2582,Dot,IMF,International
+B029,B2 — FMA medium,44952,30.0,30.0,B029_FMA044952.wav,2582,SONGO 21,Opening para Songo 21,International
+B030,B2 — FMA medium,54159,30.0,30.0,B030_FMA054159.wav,2584,Mark Neil,11 strANGE Ls,Instrumental
+C001,C1 — BELL-001 SleepThera,day1-2_exhale1,10.0,10.0,C001_BELL_day1-2_exhale1.wav,861,Bell Therapeutics,SleepThera day1-2 exhale #1,BELL-001 (exhale)
+C002,C1 — BELL-001 SleepThera,day1-2_exhale2,10.1,10.1,C002_BELL_day1-2_exhale2.wav,866,Bell Therapeutics,SleepThera day1-2 exhale #2,BELL-001 (exhale)
+C003,C1 — BELL-001 SleepThera,day1-2_inhale1,10.0,10.0,C003_BELL_day1-2_inhale1.wav,861,Bell Therapeutics,SleepThera day1-2 inhale #1,BELL-001 (inhale)
+C004,C1 — BELL-001 SleepThera,day1-2_inhale2,10.1,10.1,C004_BELL_day1-2_inhale2.wav,866,Bell Therapeutics,SleepThera day1-2 inhale #2,BELL-001 (inhale)
+C005,C1 — BELL-001 SleepThera,day3-4_exhale1,10.0,10.0,C005_BELL_day3-4_exhale1.wav,861,Bell Therapeutics,SleepThera day3-4 exhale #1,BELL-001 (exhale)
+C006,C1 — BELL-001 SleepThera,day3-4_exhale2,10.1,10.1,C006_BELL_day3-4_exhale2.wav,866,Bell Therapeutics,SleepThera day3-4 exhale #2,BELL-001 (exhale)
+C007,C1 — BELL-001 SleepThera,day3-4_exhale3,10.1,10.1,C007_BELL_day3-4_exhale3.wav,866,Bell Therapeutics,SleepThera day3-4 exhale #3,BELL-001 (exhale)
+C008,C1 — BELL-001 SleepThera,day3-4_inhale1,10.0,10.0,C008_BELL_day3-4_inhale1.wav,861,Bell Therapeutics,SleepThera day3-4 inhale #1,BELL-001 (inhale)
+C009,C1 — BELL-001 SleepThera,day3-4_inhale2,10.1,10.1,C009_BELL_day3-4_inhale2.wav,866,Bell Therapeutics,SleepThera day3-4 inhale #2,BELL-001 (inhale)
+C010,C1 — BELL-001 SleepThera,day3-4_inhale3,10.1,10.1,C010_BELL_day3-4_inhale3.wav,866,Bell Therapeutics,SleepThera day3-4 inhale #3,BELL-001 (inhale)
+C011,C1 — BELL-001 SleepThera,day5-6_exhale1,10.5,10.6,C011_BELL_day5-6_exhale1.wav,909,Bell Therapeutics,SleepThera day5-6 exhale #1,BELL-001 (exhale)
+C012,C1 — BELL-001 SleepThera,day5-6_exhale2,10.5,10.6,C012_BELL_day5-6_exhale2.wav,909,Bell Therapeutics,SleepThera day5-6 exhale #2,BELL-001 (exhale)
+C013,C1 — BELL-001 SleepThera,day5-6_inhale1,10.5,10.6,C013_BELL_day5-6_inhale1.wav,909,Bell Therapeutics,SleepThera day5-6 inhale #1,BELL-001 (inhale)
+C014,C1 — BELL-001 SleepThera,day5-6_inhale2,10.5,10.6,C014_BELL_day5-6_inhale2.wav,909,Bell Therapeutics,SleepThera day5-6 inhale #2,BELL-001 (inhale)
+C015,C1 — BELL-001 SleepThera,day7_exhale1,10.5,10.6,C015_BELL_day7_exhale1.wav,909,Bell Therapeutics,SleepThera day7 exhale #1,BELL-001 (exhale)
+C016,C1 — BELL-001 SleepThera,day7_exhale2,10.5,10.6,C016_BELL_day7_exhale2.wav,909,Bell Therapeutics,SleepThera day7 exhale #2,BELL-001 (exhale)
+C017,C1 — BELL-001 SleepThera,day7_exhale3,10.5,10.6,C017_BELL_day7_exhale3.wav,909,Bell Therapeutics,SleepThera day7 exhale #3,BELL-001 (exhale)
+C018,C1 — BELL-001 SleepThera,day7_inhale1,10.5,10.6,C018_BELL_day7_inhale1.wav,909,Bell Therapeutics,SleepThera day7 inhale #1,BELL-001 (inhale)
+C019,C1 — BELL-001 SleepThera,day7_inhale2,10.5,10.6,C019_BELL_day7_inhale2.wav,909,Bell Therapeutics,SleepThera day7 inhale #2,BELL-001 (inhale)
+C020,C1 — BELL-001 SleepThera,day7_inhale3,10.5,10.6,C020_BELL_day7_inhale3.wav,909,Bell Therapeutics,SleepThera day7 inhale #3,BELL-001 (inhale)
