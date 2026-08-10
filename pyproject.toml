@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "debussy-audio"
-version = "0.2.0"
+version = "0.2.1"
 description = "12-parameter acoustic reporting toolbox for autonomic-arousal stimulus preparation."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -41,6 +41,10 @@ dependencies = [
   "soundfile>=0.12.0",
   "numpy>=1.24.0",
   "scipy>=1.10.0",
+  # mosqito imports matplotlib inside roughness_dw and sharpness_din_st but does
+  # not declare it, so without this a clean install silently returns None for
+  # both psychoacoustic parameters. Required, not optional.
+  "matplotlib>=3.7.0",
 ]
 
 [project.optional-dependencies]
