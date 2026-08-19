@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Tier data is now a single source of truth** (`debussy._tiers`). Every
+  parameter's four evidence scores, evidence class and design implication live
+  in one table, and the tier is *derived* from them by the review's banding plus
+  its boundary rule — so moving a parameter is a one-line score edit rather than
+  a hunt through graders and prose. `docs/reference_ranges.md` is generated from
+  that table by `tools/gen_reference_ranges.py`; the graders in `_core` assert
+  their membership against it; and tests fail if the derived tiers stop matching
+  the published ones or if the documentation falls behind. The scores are
+  exported (`PARAMETERS`, `parameters_in_tier`, `parameter`) so users can apply
+  their own weighting instead of accepting the published assignment.
+- **Scores updated to the companion review's score audit.** Five Effect Evidence
+  scores were lowered (roughness 4→2, onset dynamics 4→3, sharpness 3→2, pitch
+  3→2, semantic content 2→1) and one Appraisal Independence score raised (onset
+  dynamics 2→3). Composites: roughness 12→10, sharpness 8→7, pitch 7→6, semantic
+  content 5→4.
+- **Semantic content (lyrics) moved from Tier 2 to Tier 3** — the one audit
+  change that shifted a tier. It is now reported by `tier3_items()` with an
+  `interpretation` rather than by `tier2_items()` with a `status`. It remains
+  item 9 of the reporting guideline regardless of tier.
+- **The Tier-1 boundary rule is now mechanical**: a parameter in the 9–12 band is
+  held in Tier 2 if and only if its Appraisal Independence is below 3. Tempo is
+  the only parameter it touches. This replaces the previous prose rationale,
+  which could not be checked.
+- **Numeric limits are reframed as reference values, not thresholds.** The review
+  labels every figure it quotes an exemplar drawn from the cited studies and
+  states that the evidence supports the *direction* of each principle, not its
+  cut-point. DEBUSSY's grading is unchanged in behaviour, but the values are now
+  named constants (`ROUGHNESS_REFERENCE_ASPER`, `ATTACK_REFERENCE_MS`,
+  `TEMPO_EXEMPLAR_BPM`, …) documented as defaults of DEBUSSY's own screening
+  rubric, overridable per protocol. A `FAIL` means "outside the range the cited
+  literature reports", never "shown to raise autonomic arousal".
+- Documentation now states that the eleven-item reporting guideline is
+  independent of the tier hierarchy, so rejecting the tiers is no reason to
+  reject the tool.
+
 ## [0.2.2] — 2026-08-10
 
 ### Changed

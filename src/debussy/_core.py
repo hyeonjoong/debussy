@@ -3,9 +3,16 @@
 DEBUSSY — Descriptive Evidence-Based aUditory Stimulus SurveY
 
 Computes the 11-item minimum acoustic reporting guideline proposed in the BELL
-Therapeutics sound paper (Kim, Ha, Park, Thayer, Bosi, Eerola — Table 2 of
-the manuscript "Acoustic Parameters and Norms for Autonomic Arousal
-Modulation").
+Therapeutics sound paper (Kim, Ha, Park, Kang, Thayer, Bosi, Eerola — Table 2
+of the manuscript "Acoustic Parameters for Autonomic Arousal Modulation: A
+Narrative Review and Parameter-Level Evidence Framework").
+
+The reporting guideline is deliberately independent of that review's tier
+hierarchy: its items were selected for measurability and tool availability, not
+for their tier scores, and two of the eleven correspond to a Tier-3 parameter
+or to a descriptor the review does not score at all. Rejecting the tier
+assignments is therefore no reason to reject the guideline — or this tool.
+Tier grading is an additional, separable convenience; see `_tiers`.
 
 Usage:
     python debussy.py audio.wav
@@ -52,6 +59,8 @@ from typing import Optional
 import numpy as np
 import soundfile as sf
 import scipy.signal as sps
+
+from . import _tiers
 
 
 # ---------- A-weighting (IEC 61672-1) ----------
@@ -741,6 +750,11 @@ def _fmt(v, n=3):
     return str(v)
 
 
+def _minus(v) -> str:
+    """Format a negative number with a typographic minus (U+2212), for prose."""
+    return _fmt(v).replace("-", "−")
+
+
 _SEVERITY = {"PASS": 0, "CAUTION": 1, "FAIL": 2}
 
 
@@ -751,68 +765,157 @@ def _worst_status(*statuses):
     return max(cand, key=lambda s: _SEVERITY[s]) if cand else None
 
 
+# ---------- Screening values ----------
+#
+# IMPORTANT — what these numbers are, and what they are not.
+#
+# The companion review labels every numeric value it quotes as a *reference
+# value* or *exemplar* drawn from the cited studies, explicitly NOT as an
+# evidence-derived threshold: what the literature supports is the direction of
+# each principle, not its cut-point. Attack time, for instance, has never been
+# manipulated parametrically alongside autonomic measurement, so "50 ms" is an
+# onset duration that appears in the alarm-design literature, not a validated
+# criterion.
+#
+# DEBUSSY still has to answer a yes/no question — "is this stimulus admissible
+# for my protocol?" — so it adopts those reference values as the defaults of
+# its own screening rubric. That is a tool-level design decision, not a claim
+# inherited from the review, and the distinction matters: a FAIL here means
+# "outside the range the cited literature reports", never "shown to raise
+# autonomic arousal".
+#
+# They are named constants rather than inline literals so that a protocol
+# needing different limits can state its own, and so that a future revision of
+# the review changes one line each.
+
+#: Roughness reference value (asper). Near or below this figure in the cited
+#: literature; the amygdala selectivity is for the 30–150 Hz amplitude-
+#: modulation band, and this whole-file aggregate is a proxy for it.
+ROUGHNESS_REFERENCE_ASPER = 0.3
+
+#: Share-of-duration bands above the roughness reference value. Provisional
+#: screening heuristics of DEBUSSY's own — the review reports no coverage
+#: figure at all.
+ROUGHNESS_COVERAGE_CAUTION_PCT = 2.0
+ROUGHNESS_COVERAGE_FAIL_PCT = 10.0
+
+#: Onset duration reference value (ms), from the alarm-design literature.
+ATTACK_REFERENCE_MS = 50.0
+
+#: A sharp-onset pattern is annotated only when it is both substantial and
+#: non-incidental. It downgrades PASS→CAUTION and never fails on its own:
+#: envelope rise time ignores absolute level, so it describes onset shape
+#: rather than measuring startle.
+SHARP_ONSET_SHARE_PCT = 25.0
+SHARP_ONSET_MIN_COUNT = 5
+
+#: Tempo exemplar range (BPM). The review holds tempo in Tier 2 precisely
+#: because this range is a starting point to be matched to the individual's
+#: resting heart rate, so IN_RANGE here means "at the population default",
+#: not "correct for this listener".
+TEMPO_EXEMPLAR_BPM = (60.0, 80.0)
+
+#: Sharpness exemplar upper bound (acum) — quoted as provisional in the review.
+SHARPNESS_EXEMPLAR_ACUM = 1.5
+
+#: Spectral slope β preferred band (pink-to-brown). DEBUSSY's own default; the
+#: review treats β as an interior optimum set to listener tolerance.
+SPECTRAL_SLOPE_PREFERRED_BETA = (-2.0, -1.0)
+
+#: Above this β the spectrum is white-like enough to call out specifically.
+SPECTRAL_SLOPE_WHITE_BETA = -0.5
+
+
+def _check_tier(expected: int, *keys: str) -> None:
+    """Guard against the graders drifting from the evidence table.
+
+    Each grader below declares which parameters it renders. If a revision of
+    the companion review moves one across tiers, editing the score in `_tiers`
+    is enough to make this fail loudly here rather than silently emit a
+    parameter under a tier it no longer belongs to.
+    """
+    for key in keys:
+        actual = _tiers.parameter(key).tier
+        if actual != expected:
+            raise RuntimeError(
+                f"{key!r} is Tier {actual} in the evidence table but is rendered "
+                f"by tier{expected}_items(). Move its block to tier{actual}_items()."
+            )
+
+
 def tier1_items(r: Result) -> list[dict]:
-    """Tier 1 — Universal design principles."""
+    """Tier 1 — parameters supporting a fixed design constraint.
+
+    Graded against DEBUSSY's screening rubric (see the constants above), whose
+    defaults are the reference values reported in the companion review.
+    """
+    _check_tier(1, "roughness", "onset_dynamics", "event_structure", "predictability")
     items = []
 
     # Roughness — coverage informs the verdict but only in the SAFE direction:
-    # the status is the more severe of (a) the paper's whole-file 0.3 asper check
-    # and (b) the proportion of time above 0.3 asper. So a high mean still fails
-    # even if coverage looks low, and a low mean is downgraded when rough
-    # passages recur. The per-frame 0.3 threshold and the 2%/10% bands are
-    # provisional screening heuristics, not validated cut-offs. On long files
-    # coverage is sampled (probes), so a "clean" reading is never certified.
+    # the status is the more severe of (a) the whole-file check against the
+    # reference value and (b) the proportion of time above it. So a high mean
+    # still fails even if coverage looks low, and a low mean is downgraded when
+    # rough passages recur. On long files coverage is sampled (probes), so a
+    # "clean" reading is never certified.
+    ref = ROUGHNESS_REFERENCE_ASPER
+    target = (f"mean < {_fmt(ref)}, "
+              f"≤ {_fmt(ROUGHNESS_COVERAGE_CAUTION_PCT)}% time > {_fmt(ref)}")
     v = r.roughness_asper
     cov = r.roughness_coverage_pct
     probe = (r.analysis_mode != "full")
     if v is None and cov is None:
         items.append({"parameter": "Roughness", "value": "—", "unit": "asper",
-                      "target": "mean < 0.3, ≤ 2% time > 0.3", "status": "N/A",
+                      "target": target, "status": "N/A",
                       "note": "Roughness unavailable"})
     else:
-        base = None if v is None else ("PASS" if v < 0.3 else "FAIL")
+        base = None if v is None else ("PASS" if v < ref else "FAIL")
         if cov is None:
             cov_status, cov_note = None, "no coverage time series"
-        elif cov <= 2.0:
-            cov_status, cov_note = "PASS", f"{_fmt(cov)}% of time above 0.3 asper"
-        elif cov <= 10.0:
-            cov_status, cov_note = "CAUTION", f"intermittent — {_fmt(cov)}% of time above 0.3 asper"
+        elif cov <= ROUGHNESS_COVERAGE_CAUTION_PCT:
+            cov_status, cov_note = "PASS", f"{_fmt(cov)}% of time above {_fmt(ref)} asper"
+        elif cov <= ROUGHNESS_COVERAGE_FAIL_PCT:
+            cov_status, cov_note = "CAUTION", f"intermittent — {_fmt(cov)}% of time above {_fmt(ref)} asper"
         else:
-            cov_status, cov_note = "FAIL", f"frequent — {_fmt(cov)}% of time above 0.3 asper"
+            cov_status, cov_note = "FAIL", f"frequent — {_fmt(cov)}% of time above {_fmt(ref)} asper"
         status = _worst_status(base, cov_status)
         # A sample cannot prove the absence of brief rough events.
         if probe and status == "PASS":
             status, cov_note = "CAUTION", cov_note + " (sampled — clean not certified)"
         items.append({"parameter": "Roughness", "value": _fmt(v), "unit": "asper",
-                      "target": "mean < 0.3, ≤ 2% time > 0.3",
+                      "target": target,
                       "status": status or "N/A", "note": cov_note})
 
-    # Attack time — the Tier-1 verdict is the paper's whole-file median check
-    # (> 50 ms). The share/count of sharp onsets is reported and can raise a
-    # CAUTION, but is NOT a hard fail: librosa onset + 10-90% rise is an envelope
-    # descriptor, not a validated startle metric (it ignores absolute level), and
-    # a couple of incidental transients should not condemn a long, quiet piece.
+    # Attack time — the verdict is a whole-file median check against the
+    # reference value. The share/count of sharp onsets is reported and can
+    # raise a CAUTION, but is NOT a hard fail: librosa onset + 10-90% rise is
+    # an envelope descriptor, not a validated startle metric (it ignores
+    # absolute level), and a couple of incidental transients should not condemn
+    # a long, quiet piece.
+    ref = ATTACK_REFERENCE_MS
+    target = f"median > {_fmt(ref)}"
     v = r.attack_median_ms
     sp = r.sharp_onset_pct
     nsharp = r.sharp_onset_count or 0
     if v is None and sp is None:
         items.append({"parameter": "Attack time (median)", "value": "—", "unit": "ms",
-                      "target": "median > 50", "status": "N/A",
+                      "target": target, "status": "N/A",
                       "note": "Too few onsets detected"})
     else:
         if v is None:
             status, note = "N/A", "median undefined"
         else:
-            status = "PASS" if v > 50.0 else "FAIL"
+            status = "PASS" if v > ref else "FAIL"
             note = f"median {_fmt(v)} ms"
         # Sharp-onset annotation can only downgrade PASS→CAUTION, and only when
         # the pattern is both substantial (share) and non-incidental (count).
-        if status == "PASS" and sp is not None and sp > 25.0 and nsharp >= 5:
+        if (status == "PASS" and sp is not None
+                and sp > SHARP_ONSET_SHARE_PCT and nsharp >= SHARP_ONSET_MIN_COUNT):
             status = "CAUTION"
         if sp is not None:
-            note += f"; {_fmt(sp)}% of onsets < 50 ms (n={nsharp})"
+            note += f"; {_fmt(sp)}% of onsets < {_fmt(ref)} ms (n={nsharp})"
         items.append({"parameter": "Attack time (median)", "value": _fmt(v), "unit": "ms",
-                      "target": "median > 50", "status": status, "note": note})
+                      "target": target, "status": status, "note": note})
 
     # Event structure — informational (dynamic range + crest factor)
     dr = r.dynamic_range_db
@@ -830,38 +933,48 @@ def tier1_items(r: Result) -> list[dict]:
 
 
 def tier2_items(r: Result) -> list[dict]:
-    """Tier 2 — Directional guidelines (relaxation-oriented)."""
+    """Tier 2 — parameters with an established direction but an individual optimum.
+
+    Reported in-range vs out-of-range against the exemplar values, never passed
+    or failed: the review's whole reason for holding a parameter here is that
+    the value has to be chosen per listener.
+    """
+    _check_tier(2, "tempo", "sharpness", "pitch", "spectral_slope", "complexity")
     items = []
 
-    # Tempo — 60-80 BPM relaxation range
+    # Tempo — exemplar range, to be matched to individual resting heart rate
+    lo, hi = TEMPO_EXEMPLAR_BPM
     v = r.tempo_bpm
     if v is None:
         items.append({"parameter": "Tempo", "value": "—", "unit": "BPM",
                       "status": "N/A",
                       "guidance": "Tempo not detected"})
-    elif 60 <= v <= 80:
+    elif lo <= v <= hi:
         items.append({"parameter": "Tempo", "value": _fmt(v), "unit": "BPM",
                       "status": "IN_RANGE",
-                      "guidance": "Within relaxation range (60–80 BPM)"})
+                      "guidance": f"Within the exemplar range ({_fmt(lo)}–{_fmt(hi)} BPM) — "
+                                  f"adapt toward the listener's resting heart rate"})
     else:
         items.append({"parameter": "Tempo", "value": _fmt(v), "unit": "BPM",
                       "status": "OUT_OF_RANGE",
-                      "guidance": "Outside default range — personalization recommended"})
+                      "guidance": "Outside the exemplar range — personalization recommended"})
 
-    # Sharpness — < 1.5 acum provisional target
+    # Sharpness — provisional exemplar upper bound
+    ref = SHARPNESS_EXEMPLAR_ACUM
     v = r.sharpness_acum
     if v is None:
         items.append({"parameter": "Sharpness", "value": "—", "unit": "acum",
                       "status": "N/A",
                       "guidance": "Sharpness not computed"})
-    elif v < 1.5:
+    elif v < ref:
         items.append({"parameter": "Sharpness", "value": _fmt(v), "unit": "acum",
                       "status": "IN_RANGE",
-                      "guidance": "Below provisional target (< 1.5 acum)"})
+                      "guidance": f"Below the provisional exemplar (< {_fmt(ref)} acum)"})
     else:
         items.append({"parameter": "Sharpness", "value": _fmt(v), "unit": "acum",
                       "status": "OUT_OF_RANGE",
-                      "guidance": "Above provisional target — consider reducing high-frequency energy"})
+                      "guidance": "Above the provisional exemplar — consider reducing "
+                                  "high-frequency energy"})
 
     # Spectral centroid — directional only, no absolute threshold
     v = r.spectral_centroid_hz
@@ -869,39 +982,38 @@ def tier2_items(r: Result) -> list[dict]:
                   "status": "DIRECTIONAL",
                   "guidance": "Lower values associated with calmer perception (no absolute threshold)"})
 
-    # Spectral slope β — preferred -1 to -2 (pink~brown)
+    # Spectral slope β — preferred pink-to-brown band
+    lo, hi = SPECTRAL_SLOPE_PREFERRED_BETA
     v = r.spectral_slope_beta
     if v is None:
         items.append({"parameter": "Spectral slope β", "value": "—", "unit": "",
                       "status": "N/A",
                       "guidance": "Slope not computed"})
-    elif -2.0 <= v <= -1.0:
+    elif lo <= v <= hi:
         items.append({"parameter": "Spectral slope β", "value": _fmt(v), "unit": "",
                       "status": "IN_RANGE",
-                      "guidance": "Within preferred pink-to-brown range (−2 to −1)"})
-    elif v > -0.5:
+                      "guidance": f"Within preferred pink-to-brown range "
+                                  f"({_minus(lo)} to {_minus(hi)})"})
+    elif v > SPECTRAL_SLOPE_WHITE_BETA:
         items.append({"parameter": "Spectral slope β", "value": _fmt(v), "unit": "",
                       "status": "OUT_OF_RANGE",
                       "guidance": "White-like spectrum — consider steeper roll-off"})
     else:
         items.append({"parameter": "Spectral slope β", "value": _fmt(v), "unit": "",
                       "status": "OUT_OF_RANGE",
-                      "guidance": "Outside preferred −2 to −1 range"})
+                      "guidance": f"Outside preferred {_minus(lo)} to {_minus(hi)} range"})
 
     # Complexity — not auto-detectable
     items.append({"parameter": "Complexity", "value": "—", "unit": "",
                   "status": "MANUAL",
                   "guidance": "Composite property — manual assessment required"})
 
-    # Lyrics — manual input
-    items.append({"parameter": "Lyrics presence", "value": r.lyrics or "unknown", "unit": "",
-                  "status": "MANUAL",
-                  "guidance": "Instrumental stimuli preferred for autonomic protocols"})
     return items
 
 
 def tier3_items(r: Result) -> list[dict]:
-    """Tier 3 — Exploratory / report-only parameters."""
+    """Tier 3 — exploratory adjuncts, reported without a design target."""
+    _check_tier(3, "harmonicity", "familiarity", "semantic_content")
     items = []
 
     # HNR — no universal threshold
@@ -921,6 +1033,19 @@ def tier3_items(r: Result) -> list[dict]:
         "unit": "",
         "interpretation": "Listener-dependent",
         "note": "Cannot be assessed from audio signal alone",
+    })
+
+    # Semantic content (lyrics) — caller-supplied. Moved here from Tier 2 by
+    # the score audit: no study manipulates lyric presence with an autonomic
+    # outcome, so the basis is design convention plus corpus description. It
+    # remains reporting-guideline item 9 regardless of its tier.
+    items.append({
+        "parameter": "Semantic content (lyrics)",
+        "value": r.lyrics or "unknown",
+        "unit": "",
+        "interpretation": "Listener-language dependent",
+        "note": "Instrumental stimuli are conventional in autonomic protocols; "
+                "the convention is not backed by autonomic data",
     })
 
     # Spectral flatness — proposed descriptor
@@ -1065,13 +1190,15 @@ def tier1_compliance(r: Result) -> dict:
 
 def format_compliance(r: Result) -> str:
     """Text rendering of all three tiers for the CLI."""
-    lines = ["", "=== Tier 1 — Universal Design Check ==="]
+    lines = ["", "=== Tier 1 — Fixed Design Constraints ===",
+             "    Screened against reference values from the companion review,",
+             "    which reports them as exemplars rather than validated cut-offs."]
     for it in tier1_items(r):
         mark = {"PASS": "[PASS]", "FAIL": "[FAIL]", "CAUTION": "[CAUT]",
                 "INFO": "[INFO]", "MANUAL": "[MAN ]", "N/A": "[N/A ]"}[it["status"]]
         lines.append(f"  {mark} {it['parameter']:24} {str(it['value']):>22} {it['unit']:6}"
                      f"  target {it['target']:<14}  {it['note']}")
-    lines += ["", "=== Tier 2 — Directional Guidelines ==="]
+    lines += ["", "=== Tier 2 — Directional, Optimum Set Per Listener ==="]
     for it in tier2_items(r):
         mark = {"IN_RANGE": "[ IN ]", "OUT_OF_RANGE": "[OUT ]", "DIRECTIONAL": "[DIR ]",
                 "MANUAL": "[MAN ]", "N/A": "[N/A ]"}[it["status"]]
