@@ -72,10 +72,14 @@ detector, library version. DEBUSSY closes this gap with three design choices:
 2. **Standardised internals.** Window lengths, A-weighting filter coefficients
    and the spectral-slope band are fixed and documented; deviating requires an
    explicit override, which leaves a record at the call site.
-3. **Tiered evaluation built in.** Each parameter is tagged Tier 1 (universal
-   design check), Tier 2 (directional guideline) or Tier 3 (exploratory), which
-   separates "is this stimulus admissible?" from "what does this stimulus do?" —
-   the operational decision researchers actually face.
+3. **Tiered evaluation built in.** Each parameter carries the parent review's
+   tier — Tier 1 (fixed design constraint, one value serving every listener),
+   Tier 2 (directional, optimum set per listener) or Tier 3 (exploratory) —
+   which separates "is this stimulus admissible?" from "what does this stimulus
+   do?", the operational decision researchers actually face. Only Tier 1 is
+   graded pass/fail, and against *reference values* the review reports rather
+   than validated cut-offs: a failing status means "outside the range the cited
+   literature reports", not "shown to raise arousal".
 
 # State of the field
 
@@ -143,7 +147,7 @@ both are released in `validation/`.
 
 DEBUSSY was developed in support of an ongoing review of acoustic determinants
 of autonomic arousal [@Kim:2026nbr], where it screened candidate stimuli against
-a Tier-1 acceptability rubric before they entered behavioural studies. It is now
+the Tier-1 reference values before they entered behavioural studies. It is now
 used in Bell Therapeutics' BELL-001 SleepThera clinical-trial stimulus library,
 where table-ready parameter reporting supports design-history and quality
 documentation. Releasing it independently of the parent study makes it cheap for
