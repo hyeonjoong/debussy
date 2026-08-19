@@ -1,5 +1,5 @@
 ---
-title: 'DEBUSSY: A Python toolbox for 12-parameter acoustic reporting of audio stimuli used in autonomic-arousal research'
+title: 'DEBUSSY: A Python toolbox implementing an eleven-item minimum acoustic reporting guideline for autonomic-arousal stimuli'
 tags:
   - Python
   - audio analysis
@@ -12,66 +12,159 @@ authors:
     orcid: 0000-0002-2898-0464
     corresponding: true
     affiliation: 1
+  - name: Jonghwa Jeonglok Park
+    orcid: 0000-0002-0097-5196
+    affiliation: 1
+  - name: Kyurim Kang
+    orcid: 0000-0001-8061-4456
+    affiliation: 2
   - name: Tuomas Eerola
     orcid: 0000-0002-2896-929X
-    affiliation: 2
+    affiliation: 3
 affiliations:
   - name: Neurotech Research Institute, Bell Therapeutics, Seoul, Republic of Korea
     index: 1
-  - name: Department of Music, Durham University, United Kingdom
+  - name: Center for Music and Medicine, Johns Hopkins University School of Medicine, Baltimore, MD, USA
     index: 2
-date: 6 June 2026
+  - name: Department of Music, Durham University, United Kingdom
+    index: 3
+date: 10 August 2026
 bibliography: paper.bib
 ---
 
 # Summary
 
-`DEBUSSY` is an open-source Python toolbox that computes a fixed set of twelve acoustic reporting parameters from an audio stimulus, in a single call, with output formats designed for reproducible psychophysiology and autonomic-arousal research. The parameters span five families: level (LAeq, dynamic range, crest factor), temporal envelope (attack time, tempo, modulation peak), spectral shape (centroid, slope $\beta$), tonal structure (harmonics-to-noise ratio, spectral flatness), and psychoacoustic descriptors (roughness in asper, sharpness in acum); attack time is additionally reported as mean, median and standard deviation across detected onsets. DEBUSSY composes time-frequency primitives from `librosa` [@McFee:2015] with psychoacoustic models from `MOSQITO` [@MOSQITO:2021], adds a small number of internally implemented metrics (e.g. spectral slope $\beta$ on a 50 Hz – $f_s/2$ log–log fit, attack time on an onset-aligned 10–90 % rise window), and exposes the result through a single `analyze_audio(path)` entry point that returns a typed `Result` dataclass with all twelve parameters plus run metadata. A Gradio interface on Hugging Face Spaces provides a no-install demo for non-programming users; the underlying library is the primary deliverable.
+`DEBUSSY` is an open-source Python toolbox implementing the eleven-item minimum
+acoustic reporting guideline for autonomic-arousal stimuli proposed in the parent
+review [@Kim:2026nbr], in a single call, with output formats designed for
+reproducible psychophysiology research. Nine items are measured from the audio
+and span five families: level (LAeq, dynamic range, crest
+factor), temporal envelope (attack time, tempo, modulation peak), spectral shape
+(centroid, slope $\beta$), tonal structure (harmonics-to-noise ratio, spectral
+flatness), and psychoacoustic descriptors (roughness in asper, sharpness in
+acum); attack time is additionally reported as mean, median and standard
+deviation across detected onsets. The remaining two items — lyrics presence and
+delivery method — are recorded from the caller, since no analyser can determine
+them. DEBUSSY composes time-frequency primitives from `librosa` [@McFee:2015]
+with psychoacoustic models from `MOSQITO` [@MOSQITO:2021], adds a small number of
+internally implemented metrics (spectral slope $\beta$ on a 50 Hz – $f_s/2$
+log–log fit, attack time on an onset-aligned 10–90 % rise window), and exposes
+the result through a single `analyze_audio(path)` entry point returning a typed
+`Result` dataclass with every item plus run metadata.
 
 # Statement of need
 
-Researchers preparing auditory stimuli for autonomic-arousal experiments — sleep, anxiety, cardiac vagal tone, biofeedback — routinely characterise their stimuli using a custom subset of level, temporal, spectral, and psychoacoustic descriptors, then report them in tables [@Zwicker:2007]. In practice, building this characterisation requires gluing together at least two Python libraries (`librosa` for time-frequency descriptors, `MOSQITO` for ISO/DIN-aligned psychoacoustic metrics) and writing several hundred lines of bookkeeping per study. The resulting reports are not directly comparable across labs because each lab implements the same parameter with slightly different choices (window length, A-weighting timebase, onset detector, mosqito version). DEBUSSY closes this gap with three design choices:
+Researchers preparing auditory stimuli for autonomic-arousal experiments —
+sleep, anxiety, cardiac vagal tone, biofeedback — routinely characterise their
+stimuli using a custom subset of level, temporal, spectral, and psychoacoustic
+descriptors, then report them in tables [@Zwicker:2007]. In practice this means
+gluing together at least two Python libraries (`librosa` for time-frequency
+descriptors, `MOSQITO` for ISO/DIN-aligned psychoacoustic metrics) and writing
+several hundred lines of bookkeeping per study. The resulting reports are not
+directly comparable across labs, because each lab implements the same parameter
+with slightly different choices: window length, A-weighting timebase, onset
+detector, library version. DEBUSSY closes this gap with three design choices:
 
-1. **One call, twelve parameters, one schema.** A single `analyze_audio()` returns a dataclass with the twelve parameters in the order and units of the reporting table used in [@KimPlaceholder:2026], so authors can copy-paste rows into a manuscript table without further wrangling.
-2. **Standardised internals.** Window lengths, A-weighting filter coefficients, and the spectral-slope band are fixed and documented; users who need to deviate from these defaults must override the relevant function explicitly, leaving a record in the call site.
-3. **Tier-1 / Tier-2 / Tier-3 evaluation built in.** Each parameter is tagged with a tier indicating whether it is a Tier-1 universal design check, a Tier-2 directional guideline, or a Tier-3 exploratory descriptor. This separates "is this stimulus admissible?" from "what does this stimulus do?", which is the operational decision researchers actually have to make.
+1. **One call, one schema.** A single `analyze_audio()` returns a dataclass
+   carrying the eleven items in the order and units of the reporting table of
+   the parent review [@Kim:2026nbr], so authors can copy rows into a manuscript
+   table without further wrangling.
+2. **Standardised internals.** Window lengths, A-weighting filter coefficients
+   and the spectral-slope band are fixed and documented; deviating requires an
+   explicit override, which leaves a record at the call site.
+3. **Tiered evaluation built in.** Each parameter is tagged Tier 1 (universal
+   design check), Tier 2 (directional guideline) or Tier 3 (exploratory), which
+   separates "is this stimulus admissible?" from "what does this stimulus do?" —
+   the operational decision researchers actually face.
 
 # State of the field
 
-Several mature Python toolboxes overlap with DEBUSSY. `librosa` [@McFee:2015] is the de-facto reference for time-frequency primitives in music-information-retrieval research and supplies the spectral and temporal building blocks DEBUSSY uses; it does not, however, ship psychoacoustic metrics (roughness, sharpness) and does not produce a single fixed reporting schema. `MOSQITO` [@MOSQITO:2021] provides the ISO 532-1 loudness, DIN 45692 sharpness, and Daniel–Weber roughness implementations that DEBUSSY calls, but it is a building block rather than a study-facing reporter. `Essentia` [@Bogdanov:2013] is feature-rich but bundles a large native dependency stack and is oriented to ML-feature extraction rather than human-readable reporting. `Spafe` [@Malek:2023] focuses on speech feature extraction and shares DEBUSSY's "single library covers many features" philosophy, but does not include psychoacoustic descriptors or autonomic-research conventions. `libsoni` [@OzerEtAl:2024] is the closest in spirit (a layered Python toolbox built on librosa for a specific research workflow, in their case sonification) and provided a model for the modular subpackage layout DEBUSSY adopts. DEBUSSY's contribution is therefore not a new algorithm, but an opinionated *report-level* combination of librosa and MOSQITO with study-facing conventions, a fixed reporting schema, and a validation suite that exercises every parameter on open data.
+Several mature Python toolboxes overlap with DEBUSSY. `librosa` [@McFee:2015] is
+the de-facto reference for time-frequency primitives and supplies DEBUSSY's
+spectral and temporal building blocks, but ships no psychoacoustic metrics and
+no fixed reporting schema. `MOSQITO` [@MOSQITO:2021] provides the ISO 532-1
+loudness, DIN 45692 sharpness and Daniel–Weber roughness implementations DEBUSSY
+calls, but is a building block rather than a study-facing reporter. `Essentia`
+[@Bogdanov:2013] is feature-rich but bundles a large native dependency stack and
+targets ML feature extraction rather than human-readable reporting. `Spafe`
+[@Malek:2023] shares the "one library, many features" philosophy but focuses on
+speech and omits psychoacoustic descriptors. `libsoni` [@OzerEtAl:2024] is
+closest in spirit — a layered toolbox built on librosa for one research workflow
+— and shaped DEBUSSY's modular layout. DEBUSSY's contribution is therefore not a
+new algorithm but an opinionated *report-level* combination of librosa and
+MOSQITO with study-facing conventions, a fixed schema, and a validation suite
+exercising every parameter on open data.
 
 # Software design
 
-DEBUSSY is structured as five subpackages corresponding to the five parameter families, plus a top-level `analyze_audio()` function that orchestrates them:
-
-- `debussy.level` — LAeq (A-weighted, uncalibrated dBFS unless a calibration offset is provided), dynamic range (95th – 5th percentile of short-term RMS on 50 ms windows), crest factor (20 · log₁₀ peak / RMS).
-- `debussy.envelope` — attack time per onset (10–90 % rise window, mean / median / SD), tempo (`librosa` beat tracker), modulation peak (envelope spectrum peak in 0.5 – 20 Hz).
-- `debussy.spectral` — spectral centroid, spectral slope $\beta$ on the 50 Hz – $f_s/2$ band of a log–log PSD fit.
-- `debussy.tonal` — harmonics-to-noise ratio from autocorrelation on voiced frames; spectral flatness in [0, 1].
-- `debussy.psychoacoustic` — roughness in asper (Daniel–Weber, via MOSQITO); sharpness in acum (DIN 45692, via MOSQITO).
-
-The Gradio web interface at `huggingface.co/spaces/jjjooong/debussy` is built on top of the library and provides a no-install demo for non-programming users; it is not the primary deliverable. Figure 1 in the validation section shows the per-parameter distribution for the validation benchmark; readers interested in algorithmic details should consult the library's documentation site.
+DEBUSSY is organised as five subpackages matching the parameter families —
+`level`, `envelope`, `spectral`, `tonal`, `psychoacoustic` — plus a top-level
+`analyze_audio()` that orchestrates them and returns the `Result` dataclass.
+`Result.to_dict()` and `to_json()` give lossless serialisation; `write_csv()`
+appends manuscript-ready rows. Long inputs are characterised from evenly spaced
+probes spanning the whole recording, while level metrics are computed exactly by
+streaming, so a long file never silently reports a truncated first window. A
+Gradio interface on Hugging Face Spaces provides a no-install demo; the library
+is the primary deliverable. Full API documentation is published at
+<https://hyeonjoong.github.io/debussy>.
 
 # Validation
 
-DEBUSSY was validated on a 60-track benchmark spanning three acoustic categories: the DEAM static-annotation corpus [@Aljanaki:2017], the FMA-medium subset [@Defferrard:2017], and the BELL-001 SleepThera breath-paced biofeedback stimulus set used in clinical trials. Tracks were selected by deterministic, documented criteria — DEAM low-arousal subset for the "relaxation" category A (*n*=10); DEAM mid-to-high arousal subset and FMA-medium subset (genre-stratified across Rock, Pop, Hip-Hop, Electronic, Folk, Jazz, International and Instrumental) for "frequently listened" B (*n*=30); and the BELL-001 SleepThera library covering four progressive training days × inhale/exhale pairs for clinical-trial stimuli C (*n*=20). All audio was standardised to 44.1 kHz mono 16-bit PCM WAV. The full pipeline (`analyze_audio()` on each clip) completed in approximately 37 minutes on a single thread of an Apple M-series CPU, and produced twelve non-null parameters for **58 of 60 tracks** (two HNR values undefined — for two 10.6 s BELL-001 breath clips with no autocorrelation peak above the voicing gate; all other parameters present for every track). The validation script, the audio manifest, and the raw per-track parameter matrix are released alongside the paper.
+DEBUSSY was validated on a 60-track benchmark spanning three acoustic
+categories: the DEAM static-annotation corpus [@Aljanaki:2017] low-arousal
+subset as "relaxation" (A, *n*=10); DEAM mid-to-high arousal plus a
+genre-stratified FMA-medium subset [@Defferrard:2017] as "frequently listened"
+(B, *n*=30); and the BELL-001 SleepThera breath-paced biofeedback stimuli used
+in clinical trials (C, *n*=20). All audio was standardised to 44.1 kHz mono
+16-bit PCM WAV. The pipeline produced a complete set of measured values for
+**58 of 60 tracks** — the two exceptions are ~10 s breath clips with no autocorrelation
+peak above the voicing gate, so HNR is undefined.
 
-![Distribution of the twelve DEBUSSY reporting parameters on the 60-track validation benchmark. Violin–box–strip combinations show the "relaxation" category A (DEAM low-arousal, *n*=10) versus the "frequently-listened" category B (DEAM mid-to-high arousal + FMA-medium, *n*=30); green diamonds overlay the BELL-001 SleepThera clinical-trial stimuli C (*n*=20). Cliff's δ and Mann–Whitney *p*-values for the A-vs-B contrast are annotated; asterisks mark *p* < 0.05 uncorrected (no A-vs-B contrast survives Benjamini–Hochberg correction across the twelve parameters; see text). The BELL-001 stimuli separate sharply from both music categories on level (LAeq), dynamic range, crest factor, attack time, roughness, sharpness, spectral slope and spectral flatness, consistent with their character as quiet, dynamically wide, sharp-onset breath recordings rather than continuous music; the C-vs-A/B effect sizes are reported in the text rather than annotated on the figure. \label{fig:distributions}](figures/Fig1_60tracks_with_C_overlay.png)
+The A-vs-B contrast is exploratory and underpowered: three parameters reach
+uncorrected *p* < 0.05, but none survive Benjamini–Hochberg correction across
+the twelve tests (smallest *q* = .19) and group A is small. The C category
+separates far more sharply, with very large effect sizes (|δ| ≥ 0.7) against
+*both* music categories on **seven of the twelve measured quantities** — LAeq, dynamic
+range, attack-time median, roughness, sharpness, spectral slope $\beta$ and
+spectral flatness (crest factor is close behind, δ = +0.81 against A and +0.68
+against B) — the acoustic fingerprint expected of quiet, dynamically wide,
+sharp-onset breath recordings, and detected across all four family modules. The
+purpose is not to argue a substantive claim about music or breath stimuli, which
+belongs to the parent review, but to demonstrate that every parameter returns a
+sensible, bounded, finite-variance distribution on acoustically very different
+material. Two commercial reference lists [@LewisHodgson:2011] are excluded
+pending separate licensing; adding them would bring group A to *n*=30. The
+manifest, the raw per-track parameter matrix and the scripts that regenerate
+both are released in `validation/`.
 
-For the A-vs-B contrast, three parameters reach medium effect size at uncorrected *p* < 0.05 — LAeq (δ = +0.44, *p* = .041), attack-time median (δ = +0.43, *p* = .047), and spectral centroid (δ = +0.45, *p* = .038) — but none survive Benjamini–Hochberg correction across the twelve parameters (smallest *q* = .19), and the A group is small (*n* = 10). We therefore treat the A-vs-B comparison as exploratory and underpowered: the purpose of this benchmark is to confirm that every parameter returns a sensible, finite-variance distribution on acoustically diverse material (below), not to discriminate music subtypes. Two commercial reference lists (Mindlab Top 10 [@LewisHodgson:2011] and a clinical/research-cited relaxation set including Arvo Pärt, Brian Eno, Erik Satie, Claude Debussy and others) are excluded from this validation pending separate licensing; their inclusion will bring the A category to *n*=30 and is expected to improve the power of the A-vs-B comparison.
-
-The BELL-001 stimuli (C) provide the most striking demonstration of DEBUSSY's discrimination capacity: relative to both A and B, they show very large effect sizes (|δ| ≥ 0.7) on **eight of the twelve parameters** — LAeq (markedly quieter, median −37.5 vs −17.4 dBFS-A in A), dynamic range (much wider, 65.6 vs 7.8 dB), crest factor (higher peak-to-RMS), attack-time median (shorter onsets), roughness (near-zero amplitude modulation), sharpness (much lower high-frequency emphasis), spectral slope β (less steep) and spectral flatness (much more noise-like). This is the acoustic fingerprint expected for breath recordings, and is identified across multiple DEBUSSY family-modules (level, temporal, spectral and psychoacoustic). The point of the validation is not to argue any substantive claim about music or breath stimuli — that is the role of the parent study — but to demonstrate that **every one of the twelve DEBUSSY parameters returns a sensible, bounded, finite-variance distribution on three acoustically very different stimulus categories**, and that the parameters together discriminate categories with large effect sizes when meaningful acoustic differences exist. \autoref{fig:distributions} shows the full result.
+![Distribution of the twelve quantities DEBUSSY measures on the 60-track benchmark. Violin–box–strip panels show relaxation (A, DEAM low-arousal, *n*=10) versus frequently-listened music (B, DEAM mid-to-high arousal + FMA-medium, *n*=30); green diamonds overlay the BELL-001 clinical stimuli (C, *n*=20). Cliff's δ and Mann–Whitney *p* for the A-vs-B contrast are annotated; asterisks mark uncorrected *p* < 0.05, none of which survive Benjamini–Hochberg correction. \label{fig:distributions}](figures/Fig1_60tracks_with_C_overlay.png)
 
 # Research impact
 
-DEBUSSY was developed in support of an ongoing review of acoustic determinants of autonomic arousal [@KimPlaceholder:2026], where it screened candidate stimuli against an internal acceptability rubric (Tier-1 universal design check) before they entered behavioural studies. It is now used in Bell Therapeutics' BELL-001 SleepThera clinical-trial stimulus library, where reproducible, table-ready parameter reporting supports the trial's design-history and quality documentation. By releasing DEBUSSY independently of the parent study, we aim to make it cheap for other autonomic-arousal researchers to characterise stimuli using the same twelve parameters with the same internal choices, so that acoustic descriptors become directly comparable across studies and laboratories (for level metrics, comparability additionally requires a shared calibration offset, since LAeq is reported in uncalibrated dBFS by default).
+DEBUSSY was developed in support of an ongoing review of acoustic determinants
+of autonomic arousal [@Kim:2026nbr], where it screened candidate stimuli against
+a Tier-1 acceptability rubric before they entered behavioural studies. It is now
+used in Bell Therapeutics' BELL-001 SleepThera clinical-trial stimulus library,
+where table-ready parameter reporting supports design-history and quality
+documentation. Releasing it independently of the parent study makes it cheap for
+other researchers to characterise stimuli against the same reporting guideline
+with the same internal choices, so acoustic descriptors become comparable across
+laboratories — for level metrics, comparability additionally requires a shared
+calibration offset, since LAeq is reported in uncalibrated dBFS by default.
 
 # AI usage disclosure
 
-Drafting of this manuscript, parts of the test scaffolding, and the standardisation/batch scripts used Claude (Anthropic) and ChatGPT (OpenAI) under human authorial review. All algorithmic implementations, every validation run, every figure, and the final wording of the paper were verified by the authors. No generative AI was used to produce, edit, or curate the audio data or annotations on which the validation depends.
+Drafting of this manuscript, parts of the test scaffolding, and the
+standardisation and batch scripts used Claude (Anthropic) and ChatGPT (OpenAI)
+under human authorial review. All algorithmic implementations, every validation
+run, every figure, and the final wording were verified by the authors. No
+generative AI was used to produce, edit, or curate the audio data or annotations
+on which the validation depends.
 
 # Acknowledgements
 
-We thank the Bell Therapeutics Neurotech Research Institute team for clinical-side requirements and operational support. DEBUSSY builds directly on `librosa` and `MOSQITO`; we are grateful to both communities.
+We thank the Bell Therapeutics Neurotech Research Institute team for
+clinical-side requirements and operational support. DEBUSSY builds directly on
+`librosa` and `MOSQITO`; we are grateful to both communities.
 
 # References
