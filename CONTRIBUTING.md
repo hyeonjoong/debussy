@@ -3,7 +3,28 @@
 Thank you for considering contributing to DEBUSSY. We welcome bug reports,
 feature requests, documentation improvements, and code contributions.
 
+## Getting help
+
+If you have a usage question rather than a bug — which parameter answers your
+design question, why a value came back `None`, how to report a result in a
+manuscript — start with the
+[documentation site](https://hyeonjoong.github.io/debussy/), then ask on the
+issue tracker.
+
+GitHub Discussions is not enabled on this repository, so questions and bug
+reports share one tracker and are told apart by label. Open an
+[issue](https://github.com/hyeonjoong/debussy/issues/new) and say in the first
+line that it is a usage question; a maintainer will apply the `question` label.
+You will not be able to set that label yourself unless you have triage rights,
+so please do not let a missing label stop you from asking.
+
+Questions are welcome. If the answer turns out to be "the documentation should
+have told you that", we treat it as a documentation bug and fix it.
+
 ## Reporting issues
+
+Use this route when something is wrong or missing — not for usage questions,
+which are covered above.
 
 - Search [existing issues](https://github.com/hyeonjoong/debussy/issues) before
   filing a new one.
