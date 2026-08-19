@@ -31,9 +31,11 @@ DEBUSSY fixes the choices, names them, and returns one schema:
 2. **Standardised internals** — window lengths, A-weighting coefficients and the
    spectral-slope band are fixed and documented; deviating requires an explicit
    override, which leaves a record at the call site.
-3. **Tiered evaluation built in** — each parameter is tagged Tier 1 (universal
-   design check), Tier 2 (directional guideline) or Tier 3 (exploratory), which
-   separates *"is this stimulus admissible?"* from *"what does it do?"*.
+3. **Tiered evaluation built in** — each parameter is tagged Tier 1 (fixed
+   design constraint), Tier 2 (directional, optimum set per listener) or Tier 3
+   (exploratory), which separates *"is this stimulus admissible?"* from *"what
+   does it do?"*. DEBUSSY screens against the *reference values* the companion
+   review reports, which it labels exemplars rather than validated cut-offs.
 
 ## The eleven reporting items
 

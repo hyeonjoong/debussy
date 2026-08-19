@@ -32,8 +32,13 @@ DEBUSSY closes this gap with three design choices:
 2. **Standardised internals.** Window lengths, A-weighting filter coefficients,
    and the spectral-slope band are fixed and documented.
 3. **Tier-1 / Tier-2 / Tier-3 evaluation built in.** Each parameter is tagged
-   with a tier indicating whether it is a universal design check, a directional
-   guideline, or an exploratory descriptor.
+   with a tier indicating whether it supports a fixed design constraint, a
+   direction whose optimum is set per listener, or an exploratory descriptor.
+   The evidence scores behind the tiers are exposed as data, so you can apply
+   your own weighting instead of accepting the published assignment. The
+   numeric limits DEBUSSY screens against are *reference values* reported in
+   the companion review, not validated cut-offs — see
+   [reference ranges](https://hyeonjoong.github.io/debussy/reference_ranges/).
 
 ## The eleven reporting items
 
