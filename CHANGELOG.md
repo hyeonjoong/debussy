@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Issue forms for bug reports and feature requests**
+  (`.github/ISSUE_TEMPLATE/`). CONTRIBUTING already listed what a usable bug
+  report contains — Python version, OS, `debussy.__version__`, a minimal
+  reproducer, expected vs actual — but none of it was asked for at filing time,
+  so a reporter had to find and read CONTRIBUTING first. The bug form prompts
+  for those fields directly and asks reporters to *describe* problem audio
+  rather than attach it; the feature form asks for the autonomic-arousal use
+  case, which is the scope test CONTRIBUTING applies. Blank issues stay enabled.
+
 ### Changed
 - **Tier data is now a single source of truth** (`debussy._tiers`). Every
   parameter's four evidence scores, evidence class and design implication live
