@@ -1,0 +1,64 @@
+name: Bug report
+description: DEBUSSY behaves differently from what its documentation says.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing, please check
+        [Troubleshooting](https://hyeonjoong.github.io/debussy/troubleshooting/)
+        and [existing issues](https://github.com/hyeonjoong/debussy/issues?q=is%3Aissue).
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you expected, and what you got instead. Paste the full traceback if there was one.
+      placeholder: |
+        Expected: roughness reported in asper.
+        Actual: roughness is None, no error raised.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproducer
+    attributes:
+      label: Minimal reproducer
+      description: |
+        The shortest code that shows the problem. If it only happens on a
+        particular file, describe the audio (duration, sample rate, channels,
+        format) rather than attaching it — we cannot redistribute copyrighted
+        material. `tests/conftest.py` synthesises sine, pink-noise, click-train
+        and silence signals you can adapt into a self-contained reproducer.
+      render: python
+      placeholder: |
+        from debussy import analyze_audio
+        result = analyze_audio("clip.wav")
+        print(result.roughness_asper)
+    validations:
+      required: true
+
+  - type: input
+    id: debussy-version
+    attributes:
+      label: DEBUSSY version
+      description: 'Output of `python -c "import debussy; print(debussy.__version__)"`'
+      placeholder: "0.2.2"
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Python version and OS
+      placeholder: "3.11.9, macOS 14.5 (arm64)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: anything-else
+    attributes:
+      label: Anything else
+      description: Installed `librosa` / `mosqito` versions, virtualenv vs conda, anything you already ruled out.
+    validations:
+      required: false
