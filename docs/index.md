@@ -59,7 +59,7 @@ recorded by the caller, since no analyser can determine them.
 
 `Result` also carries crest factor and temporal-coverage descriptors as
 diagnostics beyond the guideline. Per-family detail is in the
-[API overview](api/index.md); thresholds and tier grading are in
+[API overview](api/index.md); the reference values and tier grading are in
 [Reference ranges](reference_ranges.md).
 
 !!! note "Eleven items, twelve parameters — not the same list"
