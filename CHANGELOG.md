@@ -42,6 +42,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documentation now states that the eleven-item reporting guideline is
   independent of the tier hierarchy, so rejecting the tiers is no reason to
   reject the tool.
+- **`CONTRIBUTING.md` now says where to seek support.** It covered how to
+  contribute and how to report a bug, but a user with a usage question had
+  nowhere obvious to go and would reasonably have filed a bug report by
+  default. A "Getting help" section now points at the documentation first and
+  then at the issue tracker under the `question` label, notes that Discussions
+  is not enabled so the two share one tracker, and warns that reporters without
+  triage rights cannot apply the label themselves.
 
 ## [0.2.2] — 2026-08-10
 
