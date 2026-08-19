@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Issue forms for bug reports and feature requests**
+  (`.github/ISSUE_TEMPLATE/`). CONTRIBUTING already listed what a usable bug
+  report contains — Python version, OS, `debussy.__version__`, a minimal
+  reproducer, expected vs actual — but none of it was asked for at filing time,
+  so a reporter had to find and read CONTRIBUTING first. The bug form prompts
+  for those fields directly and asks reporters to *describe* problem audio
+  rather than attach it; the feature form asks for the autonomic-arousal use
+  case, which is the scope test CONTRIBUTING applies. Blank issues stay enabled.
+
 ### Changed
 - **Tier data is now a single source of truth** (`debussy._tiers`). Every
   parameter's four evidence scores, evidence class and design implication live
@@ -42,6 +52,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documentation now states that the eleven-item reporting guideline is
   independent of the tier hierarchy, so rejecting the tiers is no reason to
   reject the tool.
+- **`CONTRIBUTING.md` now says where to seek support.** It covered how to
+  contribute and how to report a bug, but a user with a usage question had
+  nowhere obvious to go and would reasonably have filed a bug report by
+  default. A "Getting help" section now points at the documentation first and
+  then at the issue tracker under the `question` label, notes that Discussions
+  is not enabled so the two share one tracker, and warns that reporters without
+  triage rights cannot apply the label themselves.
 - **The 60-track benchmark is now documented on the site, not only in the
   paper.** `docs/validation.md` gained the category composition, the 58/60
   completeness result and the A-vs-B and category-C statistics, which previously
