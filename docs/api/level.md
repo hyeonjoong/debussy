@@ -26,6 +26,8 @@ dominate. Returns `0.0` for signals shorter than one window.
 
 Lower values mean a more even stimulus; the companion review treats a stable
 mean level with minimal transients as part of the Tier-1 event-structure check.
+The check is informational: the review scores event structure on directly
+measured autonomic outcomes but reports no numeric cut-point for it.
 
 ## `a_weighting_filter(fs)`
 

@@ -17,8 +17,12 @@ Returns `n_onsets`, `mean_ms`, `median_ms`, `sd_ms`, `frac_below_50ms` and
 `n_below_50ms`. With fewer than two onsets the statistics are `None` — an
 honest "undefined", not zero.
 
-The companion review's Tier-1 onset-dynamics check uses the **median**
-(> 50 ms). The share and count of sub-50 ms onsets are reported alongside but
+DEBUSSY's Tier-1 onset-dynamics screen uses the **median** against a 50 ms
+reference value. That figure is an onset duration reported in the alarm-design
+literature, not a validated criterion — the companion review notes that attack
+time has never been manipulated parametrically alongside autonomic measurement,
+which is why its Effect Evidence score was lowered in the score audit even
+though the parameter stayed in Tier 1. The share and count of sub-50 ms onsets are reported alongside but
 only ever downgrade a pass to `CAUTION`, never fail outright: envelope rise time
 ignores absolute level, so it is a descriptor of onset shape rather than a
 validated startle metric, and a couple of incidental transients should not
