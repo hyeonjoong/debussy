@@ -14,7 +14,7 @@ framework and length-aware coverage descriptors on top.
 | Spectral centroid / flatness / slope | ✅ | ✅ | ✗ | ✅ | ✅ |
 | HNR | ✅ | ✗ | ✗ | partial | ✗ |
 | One report of the 12 arousal parameters | ✅ | ✗ | ✗ | ✗ | ✗ |
-| Tier-1/2/3 compliance verdicts | ✅ | ✗ | ✗ | ✗ | ✗ |
+| Tier-1/2/3 evidence grading | ✅ | ✗ | ✗ | ✗ | ✗ |
 | Temporal coverage (% of clip over threshold) | ✅ | ✗ | ✗ | ✗ | ✗ |
 
 **When to use each**

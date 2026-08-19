@@ -7,7 +7,7 @@ level (LAeq, dBFS-A), dynamic range, crest factor, onset attack times, roughness
 (asper), tempo / amplitude-modulation rate, spectral centroid, sharpness (acum),
 spectral slope, harmonics-to-noise ratio, spectral flatness, plus the two
 categorical fields (lyrics, delivery). Length-aware temporal-coverage descriptors
-report the *proportion* of a clip that crosses each Tier-1 threshold.
+report the *proportion* of a clip that crosses each Tier-1 reference value.
 
 ## How do I analyse one file?
 
