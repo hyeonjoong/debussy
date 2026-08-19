@@ -8,17 +8,55 @@ excerpts). The benchmark exists to check two things:
    repeated runs and across the 44.1 kHz / 48 kHz sample rates commonly found in
    stimulus libraries (mosqito resamples internally to 48 kHz; see the
    [resample notes](#sample-rate-handling)).
-2. **Discrimination** — the parameters separate calm from arousing material in
-   the directions predicted by the psychoacoustic literature (e.g. higher
+2. **Discrimination** — the parameters separate acoustically different material
+   in the directions predicted by the psychoacoustic literature (e.g. higher
    roughness and sharpness for harsher excerpts).
+
+## The 60-track benchmark
+
+Three categories, all standardised to 44.1 kHz mono 16-bit PCM WAV before
+analysis:
+
+| Category | Material | *n* |
+|---|---|---|
+| A — "relaxation" | DEAM static-annotation corpus, low-arousal subset | 10 |
+| B — "frequently listened" | DEAM mid-to-high arousal + genre-stratified FMA-medium subset | 30 |
+| C — clinical | BELL-001 SleepThera breath-paced biofeedback stimuli | 20 |
+
+The pipeline produced a complete set of measured values for **58 of 60 tracks**.
+The two exceptions are ~10 s breath clips with no autocorrelation peak above the
+voicing gate, so HNR is undefined for them rather than wrong.
+
+Two commercial reference lists are excluded pending separate licensing; adding
+them would bring group A to *n*=30. Tracking issue:
+[#9](https://github.com/hyeonjoong/debussy/issues/9).
+
+## What the benchmark shows
+
+The **A-vs-B contrast is exploratory and underpowered**. Three parameters reach
+uncorrected *p* < 0.05, but none survive Benjamini–Hochberg correction across
+the twelve tests (smallest *q* = .19), and group A is small.
+
+**Category C separates far more sharply**, with very large effect sizes
+(|δ| ≥ 0.7) against *both* music categories on **seven of the twelve measured
+quantities** — LAeq, dynamic range, attack-time median, roughness, sharpness,
+spectral slope β and spectral flatness. Crest factor is close behind
+(δ = +0.81 against A, +0.68 against B). This is the acoustic fingerprint
+expected of quiet, dynamically wide, sharp-onset breath recordings, and it is
+detected across all four family modules.
+
+The point of the benchmark is *not* a substantive claim about music or breath
+stimuli — that belongs to the companion review. It is evidence that every
+parameter returns a sensible, bounded, finite-variance distribution on
+acoustically very different material.
 
 ## Reference ranges
 
-The per-parameter reference ranges used by the three-tier compliance check are
-tabulated in [reference_ranges.md](reference_ranges.md). They follow Zwicker &
-Fastl (2007) for sharpness and roughness and the paper's own analysis for the
-level, spectral, and temporal descriptors. The ranges are **directional
-guidance**, not hard cut-offs — Tier 1 is the only pass/fail gate.
+The per-parameter reference values used by the tier check are tabulated in
+[reference_ranges.md](reference_ranges.md). They follow Zwicker & Fastl (2007)
+for sharpness and roughness and the companion review for the level, spectral,
+and temporal descriptors. They are **reference values the reviewed literature
+reports**, not validated cut-offs — and only Tier 1 is graded pass/fail.
 
 ## Reproducing the benchmark
 
@@ -32,9 +70,9 @@ results = [analyze_audio(p) for p in benchmark_paths]
 write_csv(results, "benchmark.csv")
 ```
 
-See `examples/batch_report.py` for a folder-level driver. The numeric summary
-and figures are maintained in `paper/paper.md`; this page is updated as the
-licensed A1 (Mindlab) and A3 (commercial-reference) sets are processed.
+See `examples/batch_report.py` for a folder-level driver. The manifest, the raw
+per-track parameter matrix and the scripts that regenerate both are released in
+`validation/`; `paper/paper.md` carries the summary figure.
 
 ## Sample-rate handling
 
