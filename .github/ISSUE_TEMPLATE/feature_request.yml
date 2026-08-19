@@ -1,0 +1,38 @@
+name: Feature request
+description: Propose a parameter, output format, or capability DEBUSSY does not have.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        DEBUSSY is a reporting toolbox for autonomic-arousal stimulus
+        preparation, not a general audio-feature library. See
+        [what we will and will not accept](https://github.com/hyeonjoong/debussy/blob/main/CONTRIBUTING.md#what-we-will-and-will-not-accept).
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What should DEBUSSY do?
+      description: The change itself — a new parameter, an export format, a CLI flag.
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Autonomic-arousal use case
+      description: |
+        Which stimulus-preparation or reporting task does this serve, and why
+        can it not be done with the current output? For a new parameter, cite
+        the literature linking it to autonomic arousal — that citation goes in
+        the docstring if the parameter is added.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+      description: Existing DEBUSSY output, or another library (`librosa`, `MOSQITO`, `essentia`) that already does this.
+    validations:
+      required: false
