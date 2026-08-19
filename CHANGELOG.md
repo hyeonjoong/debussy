@@ -59,6 +59,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   then at the issue tracker under the `question` label, notes that Discussions
   is not enabled so the two share one tracker, and warns that reporters without
   triage rights cannot apply the label themselves.
+- **The 60-track benchmark is now documented on the site, not only in the
+  paper.** `docs/validation.md` gained the category composition, the 58/60
+  completeness result and the A-vs-B and category-C statistics, which previously
+  existed only in `paper/paper.md`; the page had said the numbers were
+  "maintained in paper/paper.md" and described the benchmark by the wrong
+  categories. Its reference-range paragraph also still called the values
+  "directional guidance" and Tier 2 "soft", which the score audit had already
+  replaced everywhere else.
 
 ## [0.2.2] — 2026-08-10
 
