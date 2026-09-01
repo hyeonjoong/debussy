@@ -22,6 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hold the same values the literals did.
 - `attack_times_ms()` omitted the sharp-onset count key entirely on the
   fewer-than-two-onsets path, where the other early return supplies it.
+- **A clip exactly one 50 ms window long no longer crashes `analyze_audio()`.**
+  `dynamic_range_db()` guarded only `len(y) < win`, but its frame loop stops
+  before `i = len(y) - win`, so at exactly one window it built an empty array
+  and `np.percentile` raised a bare `IndexError` — a clip one sample shorter or
+  longer analysed fine. Such a clip holds a single short-term RMS value, so it
+  now reports a 0 dB span, matching what the streaming long-file path already
+  returned when it collected no full window. Longer inputs are unaffected, so
+  the published benchmark values are unchanged.
 
 ### Changed
 - **`attack_times_ms()` return keys renamed** `frac_below_50ms` →
