@@ -113,7 +113,8 @@ def attack_times_ms(y: np.ndarray, fs: int, librosa) -> dict:
     )
     if len(onsets) < 2:
         return {"n_onsets": int(len(onsets)), "mean_ms": None,
-                "median_ms": None, "sd_ms": None, "frac_below_50ms": None}
+                "median_ms": None, "sd_ms": None,
+                "frac_below_reference_ms": None, "n_below_reference_ms": 0}
 
     env = np.abs(sps.hilbert(y))
     smoothing_n = max(1, int(0.005 * fs))  # 5 ms smoothing
@@ -142,21 +143,24 @@ def attack_times_ms(y: np.ndarray, fs: int, librosa) -> dict:
     if not attacks:
         return {"n_onsets": int(len(onsets)), "mean_ms": None,
                 "median_ms": None, "sd_ms": None,
-                "frac_below_50ms": None, "n_below_50ms": 0}
+                "frac_below_reference_ms": None, "n_below_reference_ms": 0}
     arr = np.array(attacks)
     return {
         "n_onsets": int(len(onsets)),
         "mean_ms": float(np.mean(arr)),
         "median_ms": float(np.median(arr)),
         "sd_ms": float(np.std(arr)),
-        # Both the SHARE and the COUNT of onsets faster than the 50 ms startle
-        # threshold. Count matters: a couple of incidental sharp transients in a
-        # long file should not read the same as pervasive sharp onsets. NOTE:
-        # librosa onset + 10-90% rise is an envelope descriptor, not a validated
-        # startle metric (it ignores absolute level), so this annotates rather
-        # than hard-fails the Tier-1 check.
-        "frac_below_50ms": float(np.mean(arr < 50.0) * 100.0),
-        "n_below_50ms": int(np.sum(arr < 50.0)),
+        # Both the SHARE and the COUNT of onsets faster than the onset-duration
+        # reference value (ATTACK_REFERENCE_MS, defined with the other screening
+        # values below — read here rather than repeated, so a protocol that sets
+        # its own limit gets a share counted against that limit). Count matters:
+        # a couple of incidental sharp transients in a long file should not read
+        # the same as pervasive sharp onsets. NOTE: librosa onset + 10-90% rise
+        # is an envelope descriptor, not a validated startle metric (it ignores
+        # absolute level), so this annotates rather than hard-fails the Tier-1
+        # check.
+        "frac_below_reference_ms": float(np.mean(arr < ATTACK_REFERENCE_MS) * 100.0),
+        "n_below_reference_ms": int(np.sum(arr < ATTACK_REFERENCE_MS)),
     }
 
 
@@ -307,13 +311,16 @@ def psychoacoustics(y: np.ndarray, fs: int, suppress_warnings: bool = False) -> 
             R, _, _, _ = roughness_dw(y, fs, overlap=0.5)
         R = np.asarray(R, dtype=float)
         out["roughness_asper"] = float(np.nanmean(R))
-        # Temporal coverage: share of the duration whose instantaneous
-        # roughness exceeds the 0.3 asper amygdala-activation threshold.
-        # The whole-file mean can stay below 0.3 while brief rough passages
-        # still cross it — coverage exposes that proportion.
+        # Temporal coverage: share of the duration whose instantaneous roughness
+        # exceeds the roughness reference value (ROUGHNESS_REFERENCE_ASPER,
+        # defined with the other screening values below — read here rather than
+        # repeated, so re-pointing the constant moves the coverage figure with
+        # it). The whole-file mean can stay below the reference value while
+        # brief rough passages still cross it; coverage exposes that proportion.
         finite = R[np.isfinite(R)]
         if finite.size:
-            out["roughness_coverage_pct"] = float(np.mean(finite > 0.3) * 100.0)
+            out["roughness_coverage_pct"] = float(
+                np.mean(finite > ROUGHNESS_REFERENCE_ASPER) * 100.0)
     except Exception as e:
         out["_roughness_err"] = str(e)
     try:
@@ -354,12 +361,14 @@ class Result:
     crest_factor_db: Optional[float] = None
     # --- Temporal coverage (exploratory; additive — does NOT alter the 12
     # headline parameters or the validation benchmark). Each reports the
-    # PROPORTION of the stimulus that violates a Tier-1 threshold, so a long
-    # clip that is calm on average but has brief harsh passages no longer
+    # PROPORTION of the stimulus that sits beyond a Tier-1 reference value, so a
+    # long clip that is calm on average but has brief harsh passages no longer
     # passes silently. ---
-    roughness_coverage_pct: Optional[float] = None   # % time roughness > 0.3 asper
-    sharp_onset_pct: Optional[float] = None           # % onsets attack < 50 ms
-    sharp_onset_count: int = 0                        # count of onsets attack < 50 ms
+    # % time roughness above ROUGHNESS_REFERENCE_ASPER
+    roughness_coverage_pct: Optional[float] = None
+    # share / count of onsets faster than ATTACK_REFERENCE_MS
+    sharp_onset_pct: Optional[float] = None
+    sharp_onset_count: int = 0
     # "full"  = whole file analysed (exact, used for every benchmark track)
     # "probe" = long file estimated from evenly spaced probes (coverage is a
     #           SAMPLE — rare events may be missed, so "clean" is never certified)
@@ -479,9 +488,9 @@ def _result_from_signal(y: np.ndarray, fs: int, file: str, duration_s: float,
         crest_factor_db=round(crest_db, 2) if crest_db is not None else None,
         roughness_coverage_pct=(round(psy["roughness_coverage_pct"], 1)
                                 if psy.get("roughness_coverage_pct") is not None else None),
-        sharp_onset_pct=(round(att["frac_below_50ms"], 1)
-                         if att.get("frac_below_50ms") is not None else None),
-        sharp_onset_count=int(att.get("n_below_50ms", 0) or 0),
+        sharp_onset_pct=(round(att["frac_below_reference_ms"], 1)
+                         if att.get("frac_below_reference_ms") is not None else None),
+        sharp_onset_count=int(att.get("n_below_reference_ms", 0) or 0),
         analysis_mode=analysis_mode,
         notes="; ".join(notes),
     )
@@ -1072,8 +1081,8 @@ def tier3_items(r: Result) -> list[dict]:
 #
 # The 12 headline parameters are whole-file aggregates (means / percentiles),
 # so a long stimulus that is calm on average can still contain brief passages
-# that cross a Tier-1 threshold — and a mean hides them. Coverage reports the
-# PROPORTION of the stimulus that violates each threshold, which is the
+# beyond a Tier-1 reference value — and a mean hides them. Coverage reports the
+# PROPORTION of the stimulus that sits beyond each reference value, which is the
 # clinically relevant quantity for a "do no harm / no startle" design check
 # (a single sharp onset can drive arousal regardless of the average).
 #
@@ -1083,15 +1092,22 @@ def tier3_items(r: Result) -> list[dict]:
 def coverage_items(r: Result) -> list[dict]:
     items = []
 
+    # The "threshold" key is the rendered reference value, built from the
+    # constants rather than retyped. (The key name predates the reference-value
+    # wording and is kept as-is: callers index on it.)
+    rough_limit = f"{_fmt(ROUGHNESS_REFERENCE_ASPER)} asper"
+    rough_ref = f"> {rough_limit}"
+    attack_ref = f"< {_fmt(ATTACK_REFERENCE_MS)} ms"
+
     v = r.roughness_coverage_pct
     if v is None:
         items.append({"parameter": "Roughness coverage", "value": "—",
-                      "threshold": "> 0.3 asper",
+                      "threshold": rough_ref,
                       "interpretation": "—",
                       "note": "Roughness time series unavailable"})
     else:
         if v == 0:
-            interp = "Clean — never crosses threshold"
+            interp = "Clean — never above the reference value"
         elif v < 5:
             interp = "Brief excursions only"
         elif v < 25:
@@ -1099,9 +1115,9 @@ def coverage_items(r: Result) -> list[dict]:
         else:
             interp = "Sustained roughness"
         sampled = " (sampled — clean not certified)" if r.analysis_mode != "full" else ""
-        note = "Share of duration above the amygdala-activation threshold" + sampled
+        note = f"Share of duration above {rough_limit}" + sampled
         items.append({"parameter": "Roughness coverage", "value": f"{_fmt(v)} %",
-                      "threshold": "> 0.3 asper",
+                      "threshold": rough_ref,
                       "interpretation": interp,
                       "note": note})
 
@@ -1109,7 +1125,7 @@ def coverage_items(r: Result) -> list[dict]:
     n = r.sharp_onset_count or 0
     if v is None:
         items.append({"parameter": "Sharp-onset share", "value": "—",
-                      "threshold": "< 50 ms",
+                      "threshold": attack_ref,
                       "interpretation": "—",
                       "note": "Too few onsets detected"})
     else:
@@ -1122,7 +1138,7 @@ def coverage_items(r: Result) -> list[dict]:
         else:
             interp = "Predominantly sharp onsets"
         items.append({"parameter": "Sharp-onset share", "value": f"{_fmt(v)} % (n={n})",
-                      "threshold": "< 50 ms",
+                      "threshold": attack_ref,
                       "interpretation": interp,
                       "note": "Envelope descriptor, not a validated startle metric — annotation only"})
 
@@ -1130,12 +1146,12 @@ def coverage_items(r: Result) -> list[dict]:
 
 
 def plot_coverage(r: Result):
-    """Horizontal bars showing the proportion of the stimulus that violates
-    each Tier-1 threshold (0 % = clean, 100 % = always violating)."""
+    """Horizontal bars showing the proportion of the stimulus that sits beyond
+    each Tier-1 reference value (0 % = never, 100 % = throughout)."""
     import matplotlib.pyplot as plt
     rows = [
-        ("Roughness > 0.3 asper", r.roughness_coverage_pct),
-        ("Onsets < 50 ms",        r.sharp_onset_pct),
+        (f"Roughness > {_fmt(ROUGHNESS_REFERENCE_ASPER)} asper", r.roughness_coverage_pct),
+        (f"Onsets < {_fmt(ATTACK_REFERENCE_MS)} ms",             r.sharp_onset_pct),
     ]
     labels = [a for a, _ in rows]
     vals = [(b if b is not None else 0.0) for _, b in rows]
@@ -1158,7 +1174,7 @@ def plot_coverage(r: Result):
     ax.set_yticklabels(labels, fontsize=9)
     ax.invert_yaxis()
     ax.set_xlim(0, 100)
-    ax.set_xlabel("% of stimulus duration violating threshold", fontsize=9)
+    ax.set_xlabel("% of stimulus duration beyond the reference value", fontsize=9)
     for i, (b) in enumerate(vals):
         txt = "—" if rows[i][1] is None else f"{b:.0f}%"
         ax.text(min(b + 2, 95), i, txt, va="center", fontsize=8)
