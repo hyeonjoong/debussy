@@ -13,16 +13,19 @@ Per-onset attack time: onsets from `librosa.onset.onset_detect` with
 backtracking, then for each onset the **10 %–90 % rise time** of the Hilbert
 envelope (smoothed over 5 ms) up to the next onset.
 
-Returns `n_onsets`, `mean_ms`, `median_ms`, `sd_ms`, `frac_below_50ms` and
-`n_below_50ms`. With fewer than two onsets the statistics are `None` — an
-honest "undefined", not zero.
+Returns `n_onsets`, `mean_ms`, `median_ms`, `sd_ms`, `frac_below_reference_ms`
+and `n_below_reference_ms`. With fewer than two onsets the statistics are
+`None` — an honest "undefined", not zero.
 
 DEBUSSY's Tier-1 onset-dynamics screen uses the **median** against a 50 ms
-reference value. That figure is an onset duration reported in the alarm-design
+reference value, `debussy._core.ATTACK_REFERENCE_MS`. The last two keys count
+onsets against that same constant, which is why they are not named for the
+number: re-point the constant and they follow. That figure is an onset duration
+reported in the alarm-design
 literature, not a validated criterion — the companion review notes that attack
 time has never been manipulated parametrically alongside autonomic measurement,
 which is why its Effect Evidence score was lowered in the score audit even
-though the parameter stayed in Tier 1. The share and count of sub-50 ms onsets are reported alongside but
+though the parameter stayed in Tier 1. The share and count of sub-reference onsets are reported alongside but
 only ever downgrade a pass to `CAUTION`, never fail outright: envelope rise time
 ignores absolute level, so it is a descriptor of onset shape rather than a
 validated startle metric, and a couple of incidental transients should not

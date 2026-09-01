@@ -29,11 +29,15 @@ strongest single Tier-1 constraint: 30–150 Hz amplitude modulation drives
 amygdala threat-detection responses. The target is **mean < 0.3 asper**.
 
 `roughness_coverage_pct` exists because a mean can hide things. A stimulus that
-is calm for four minutes and harsh for ten seconds can average below threshold
-while still containing the passage that matters. The Tier-1 verdict therefore
-takes the **more severe** of the whole-file mean and the proportion of time
-above 0.3 asper — coverage can only make a verdict more conservative, never
-rescue a high mean.
+is calm for four minutes and harsh for ten seconds can average below the
+reference value while still containing the passage that matters. The Tier-1
+verdict therefore takes the **more severe** of the whole-file mean and the
+proportion of time above the reference value — coverage can only make a verdict
+more conservative, never rescue a high mean.
+
+Both the mean check and the coverage count read
+`debussy._core.ROUGHNESS_REFERENCE_ASPER` (0.3 asper by default), so a protocol
+that sets its own limit gets both figures against that limit.
 
 The 2 % / 10 % coverage bands are **provisional screening heuristics**, not
 validated cut-offs.
