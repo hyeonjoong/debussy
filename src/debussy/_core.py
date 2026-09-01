@@ -94,7 +94,15 @@ def dynamic_range_db(y: np.ndarray, fs: int, win_ms: float = 50.0) -> float:
     of short-term RMS levels (dB)."""
     win = max(1, int(fs * win_ms / 1000))
     hop = max(1, win // 2)
-    if len(y) < win:
+    # A clip of one window or less holds at most a single short-term RMS value,
+    # whose p95-p5 span is 0 dB — the same answer _stream_level_metrics already
+    # returns when it collects no full window. The frame loop below stops before
+    # i = len(y) - win, so at exactly one window it built an empty array and
+    # np.percentile raised a bare IndexError out of analyze_audio. The hop
+    # stride is deliberately left alone: extending it to pick up that final
+    # frame would move dynamic_range_db for every longer input and break
+    # reproduction of the published benchmark values.
+    if len(y) <= win:
         return 0.0
     rms = np.array([
         np.sqrt(np.mean(y[i:i + win] ** 2) + 1e-20)
