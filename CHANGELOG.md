@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **The temporal-coverage metrics now read the reference-value constants
+  instead of repeating them as literals.** `ROUGHNESS_REFERENCE_ASPER` and
+  `ATTACK_REFERENCE_MS` are documented as named constants so a protocol needing
+  different limits can state its own, but `roughness_coverage_pct` counted
+  frames above a hard-coded `0.3`, `sharp_onset_pct`/`sharp_onset_count`
+  counted onsets below a hard-coded `50.0`, and `coverage_items()` /
+  `plot_coverage()` printed those numbers as literal strings. Re-pointing a
+  constant therefore moved the Tier-1 mean check but not the coverage figure
+  graded against `ROUGHNESS_COVERAGE_CAUTION_PCT` /
+  `ROUGHNESS_COVERAGE_FAIL_PCT`, so a stimulus could be cautioned or failed
+  against a limit nobody had set. Default output is unchanged — the constants
+  hold the same values the literals did.
+- `attack_times_ms()` omitted the sharp-onset count key entirely on the
+  fewer-than-two-onsets path, where the other early return supplies it.
+
+### Changed
+- **`attack_times_ms()` return keys renamed** `frac_below_50ms` →
+  `frac_below_reference_ms` and `n_below_50ms` → `n_below_reference_ms`. The old
+  names hard-coded a number the caller is invited to change. `Result` fields
+  (`sharp_onset_pct`, `sharp_onset_count`) are unaffected.
+- Code and API-doc prose describing these two numbers now calls them reference
+  values rather than thresholds, matching the constants block that already
+  said so. The `"threshold"` key returned by `coverage_items()` keeps its name;
+  only its rendered value is now derived from the constants.
+
 ### Added
 - **Issue forms for bug reports and feature requests**
   (`.github/ISSUE_TEMPLATE/`). CONTRIBUTING already listed what a usable bug
