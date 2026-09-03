@@ -37,6 +37,23 @@ The **A-vs-B contrast is exploratory and underpowered**. Three parameters reach
 uncorrected *p* < 0.05, but none survive Benjamini–Hochberg correction across
 the twelve tests (smallest *q* = .19), and group A is small.
 
+!!! warning "Do not read the A-vs-B effect sizes as findings"
+
+    At *n*=10 versus *n*=30 the δ values are unstable in **sign**, not merely
+    in magnitude. A 150-per-group sensitivity draw released alongside the
+    benchmark separates on **ten of twelve** parameters, and reverses four of
+    them — LAeq, spectral centroid, sharpness and spectral flatness all move
+    from positive to strongly negative. An independent corpus agrees with the
+    larger draw on ten of twelve signs.
+
+    Simulated power explains the discrepancy rather than excusing it: at the
+    effect sizes actually present, the published design had **11–30 % power**,
+    so its null was uninformative and its signs were close to coin flips.
+
+    Run `python validation/sensitivity_power.py --power` for the full table.
+    The 60-track benchmark itself is unchanged; this is an additional analysis,
+    not a correction to the released data.
+
 **Category C separates far more sharply**, with very large effect sizes
 (|δ| ≥ 0.7) against *both* music categories on **seven of the twelve measured
 quantities** — LAeq, dynamic range, attack-time median, roughness, sharpness,

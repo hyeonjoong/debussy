@@ -105,16 +105,17 @@ is undefined.
 
 The point is not a claim about music or breath stimuli, which belongs to the
 parent review, but a demonstration that every parameter returns a bounded,
-finite-variance distribution on acoustically very different material. The
-A-vs-B contrast is exploratory and underpowered — no parameter survives
-Benjamini–Hochberg correction — while category C separates from both music
-categories with very large effect sizes on seven of the twelve quantities. Two
-commercial reference lists [@LewisHodgson:2011] await licensing. The manifest,
-the raw parameter matrix, per-category statistics and the regenerating scripts
-are released in `validation/` and described at
+finite-variance distribution on acoustically very different material. Category C
+separates from both music categories with very large effect sizes on seven of
+the twelve quantities. The A-vs-B contrast is underpowered — nothing survives
+Benjamini–Hochberg correction, and at *n*=10 its δ values are unstable in sign:
+a released 150-per-group sensitivity draw separates on ten of twelve and
+reverses four. Two commercial lists [@LewisHodgson:2011] await licensing. The
+manifest, parameter matrix, statistics and regenerating scripts are in
+`validation/` and described at
 <https://hyeonjoong.github.io/debussy/validation/>.
 
-![Distribution of the twelve quantities DEBUSSY measures on the 60-track benchmark. Violin–box–strip panels show relaxation (A, *n*=10) versus frequently-listened music (B, *n*=30); green diamonds overlay the clinical stimuli (C, *n*=20). Cliff's δ and Mann–Whitney *p* for the A-vs-B contrast are annotated; asterisks mark uncorrected *p* < 0.05, none of which survive correction. \label{fig:distributions}](figures/Fig1_60tracks_with_C_overlay.png)
+![Distribution of the twelve quantities DEBUSSY measures on the 60-track benchmark. Violin–box–strip panels show relaxation (A, *n*=10) versus frequently-listened music (B, *n*=30); green diamonds overlay the clinical stimuli (C, *n*=20). Cliff's δ and Mann–Whitney *p* for the A-vs-B contrast are annotated; asterisks mark uncorrected *p* < 0.05, none of which survive correction; see `validation/sensitivity_power.py`. \label{fig:distributions}](figures/Fig1_60tracks_with_C_overlay.png)
 
 # Research impact
 
