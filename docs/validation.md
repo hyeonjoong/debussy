@@ -40,11 +40,12 @@ the twelve tests (smallest *q* = .19), and group A is small.
 !!! warning "Do not read the A-vs-B effect sizes as findings"
 
     At *n*=10 versus *n*=30 the δ values are unstable in **sign**, not merely
-    in magnitude. A 150-per-group sensitivity draw released alongside the
-    benchmark separates on **ten of twelve** parameters, and reverses four of
-    them — LAeq, spectral centroid, sharpness and spectral flatness all move
-    from positive to strongly negative. An independent corpus agrees with the
-    larger draw on ten of twelve signs.
+    in magnitude. Redrawn at 150 per group **within the same arousal bands** —
+    so the only thing that changed is *n* — **eleven of twelve** parameters
+    separate, and four reverse sign: LAeq, spectral centroid, sharpness and
+    spectral flatness all move from positive to strongly negative. A second
+    draw at the arousal extremes and an independent corpus (FMA) agree on the
+    direction.
 
     Simulated power explains the discrepancy rather than excusing it: at the
     effect sizes actually present, the published design had **11–30 % power**,

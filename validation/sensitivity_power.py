@@ -6,15 +6,21 @@ Benjamini-Hochberg correction. That is true, but on its own it is ambiguous: a
 null at *n*=10 versus *n*=30 could mean the parameters do not separate the
 categories, or simply that the benchmark cannot see effects of the size present.
 
-This distinguishes the two. It reads the two 300-track draws released alongside
+This distinguishes the two. It reads three 300-track draws released alongside
 it and reports, per parameter, Cliff's delta and a Benjamini-Hochberg q across
-the same twelve tests, so all three can be read side by side.
+the same twelve tests, so all four can be read side by side.
 
+* `data/parameters_sensitivity_narrow150.csv` — **the primary arm.** DEAM, 150
+  per group drawn at random *within the published arousal bands* (A 2.30-3.40,
+  B 5.00-7.80), 45 s excerpts as in the published benchmark. The only thing that
+  differs from the released benchmark is *n*, so a result here cannot be
+  attributed to a change of groups.
 * `data/parameters_sensitivity_n150.csv` — DEAM, 150 per group by annotated
-  arousal (A lowest, B highest), 45 s excerpts as in the published benchmark.
+  arousal extremes (A lowest, B highest). Larger effects, but wider bands than
+  the published ones, so it cannot on its own separate power from band width.
 * `data/parameters_sensitivity_fma150.csv` — an independent corpus. FMA tracks
   tagged ambient / drone / minimal against everything else, 150 each, 30 s FMA
-  clips. Compared only within FMA, never pooled with the DEAM draw, since the
+  clips. Compared only within FMA, never pooled with the DEAM draws, since the
   clip lengths differ.
 
 The second exists because agreement between corpora that share no annotators,
@@ -26,15 +32,15 @@ smaller — the question it answers is direction, not magnitude.
     python validation/sensitivity_power.py
     python validation/sensitivity_power.py --power   # also print the power curve
 
-The draw itself: 150 tracks per group from the 1802 annotated DEAM tracks by a
-stated rule — group A the lowest annotated arousal, group B the highest —
-standardised identically to the published benchmark (44.1 kHz mono 16-bit,
-centred 45 s) and analysed with the same `analyze_audio()` entry point.
+All DEAM draws come from the 1802 annotated tracks, standardised identically
+to the published benchmark (44.1 kHz mono 16-bit, centred 45 s) and analysed
+with the same `analyze_audio()` entry point.
 
-Regenerating the matrix needs the DEAM audio, which is not redistributable here;
-`benchmark/10_power_analysis/deam_scale.py` in the working repository does that
-step. This script runs on the released matrix with no audio required, exactly as
-`analyze_results.py` does.
+Regenerating a matrix needs the DEAM or FMA audio, which is not redistributable
+here; `10_power_analysis/deam_narrowband.py`, `deam_scale.py` and
+`fma_replicate.py` in the working repository do that step. This script runs on
+the released matrices with no audio required, exactly as `analyze_results.py`
+does.
 """
 from __future__ import annotations
 
@@ -134,63 +140,65 @@ def power_curve(deltas, ns=(10, 30, 60, 100, 150), alpha=0.05 / 12, iters=1500,
     return pd.DataFrame(rows)
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--matrix", default=str(HERE / "data/parameters_sensitivity_n150.csv"))
-    ap.add_argument("--fma", default=str(HERE / "data/parameters_sensitivity_fma150.csv"),
-                    help="independent-corpus draw; pass '' to skip it")
-    ap.add_argument("--power", action="store_true",
-                    help="also simulate power at the observed effect sizes")
-    args = ap.parse_args()
-
-    df = pd.read_csv(args.matrix)
+def report_arm(title: str, df: pd.DataFrame, primary_deltas=None):
+    """Print one arm's table; if a primary is given, mark sign agreement."""
     n_a = int((df["group"] == "A").sum())
     n_b = int((df["group"] == "B").sum())
+    print(f"\n{title}")
     print(f"{len(df)} tracks — group A n={n_a}, group B n={n_b}")
     if "arousal" in df.columns:
         for g in ("A", "B"):
             s = df.loc[df["group"] == g, "arousal"]
             print(f"  group {g}: annotated arousal {s.min():.2f}-{s.max():.2f}")
-    print()
-
     deltas, pvals, qvals = contrast(df)
-    print(f"{'parameter':24} {'delta':>7} {'p':>10} {'q (BH)':>10}")
-    print("-" * 54)
+    tail = "   agrees with primary" if primary_deltas is not None else ""
+    print(f"{'parameter':24} {'delta':>7} {'p':>10} {'q (BH)':>10}{tail}")
+    print("-" * (54 + len(tail)))
     order = np.argsort([abs(d) if not np.isnan(d) else -1 for d in deltas])[::-1]
+    agree_n = 0
     for i in order:
         _, label = PARAMS[i]
         star = " *" if qvals[i] < 0.05 else "  "
-        print(f"{label:24} {deltas[i]:>+7.2f} {pvals[i]:>10.2e} {qvals[i]:>10.3f}{star}")
-
+        agree = ""
+        if primary_deltas is not None and not (np.isnan(deltas[i]) or np.isnan(primary_deltas[i])):
+            same = np.sign(deltas[i]) == np.sign(primary_deltas[i])
+            agree_n += int(same)
+            agree = "   yes" if same else "   NO"
+        print(f"{label:24} {deltas[i]:>+7.2f} {pvals[i]:>10.2e} {qvals[i]:>10.3f}{star}{agree}")
     surviving = int(np.nansum(qvals < 0.05))
-    print(f"\n{surviving}/12 survive Benjamini-Hochberg at 0.05"
-          f"  (the 60-track benchmark: 0/12, smallest q = 0.19)")
-    print("* = survives correction")
+    line = f"{surviving}/12 survive Benjamini-Hochberg at 0.05"
+    if primary_deltas is not None:
+        line += f"; {agree_n}/12 agree on sign with the primary arm"
+    print(line)
+    return deltas
 
-    fma_path = Path(args.fma) if args.fma else None
-    if fma_path is not None and fma_path.exists():
-        fma = pd.read_csv(fma_path)
-        f_d, _, f_q = contrast(fma)
-        print(f"\nIndependent corpus (FMA, ambient/drone/minimal vs the rest, "
-              f"n={int((fma['group']=='A').sum())} each):")
-        print(f"{'parameter':24} {'delta':>7} {'q (BH)':>10}   agrees on sign")
-        print("-" * 62)
-        for i, (_, label) in enumerate(PARAMS):
-            agree = ""
-            if not (np.isnan(f_d[i]) or np.isnan(deltas[i])):
-                agree = "yes" if np.sign(f_d[i]) == np.sign(deltas[i]) else "NO"
-            star = " *" if f_q[i] < 0.05 else "  "
-            print(f"{label:24} {f_d[i]:>+7.2f} {f_q[i]:>10.3f}{star}   {agree}")
-        both = sum(1 for i in range(len(PARAMS))
-                   if not (np.isnan(f_d[i]) or np.isnan(deltas[i]))
-                   and np.sign(f_d[i]) == np.sign(deltas[i]))
-        print(f"\n{int(np.nansum(f_q < 0.05))}/12 survive BH here; "
-              f"{both}/12 agree on sign with the DEAM draw")
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--matrix", default=str(HERE / "data/parameters_sensitivity_narrow150.csv"),
+                    help="primary arm: published bands, n=150 per group")
+    ap.add_argument("--wide", default=str(HERE / "data/parameters_sensitivity_n150.csv"),
+                    help="corroborating arm: arousal extremes; pass '' to skip")
+    ap.add_argument("--fma", default=str(HERE / "data/parameters_sensitivity_fma150.csv"),
+                    help="independent-corpus arm; pass '' to skip")
+    ap.add_argument("--power", action="store_true",
+                    help="also simulate power at the primary arm's effect sizes")
+    args = ap.parse_args()
+
+    primary = report_arm("PRIMARY — published bands held fixed, n raised to 150",
+                         pd.read_csv(args.matrix))
+    print("  (the released 60-track benchmark, same bands: 0/12, smallest q = 0.19)")
+    print("  * = survives correction")
+
+    for label, path in (("Wide-band DEAM draw (arousal extremes)", args.wide),
+                        ("Independent corpus (FMA, ambient/drone/minimal vs the rest)", args.fma)):
+        if path and Path(path).exists():
+            report_arm(label, pd.read_csv(path), primary_deltas=primary)
 
     if args.power:
-        print("\nSimulated power at these effect sizes "
+        print("\nSimulated power at the primary arm's effect sizes "
               "(alpha = 0.05/12, two-sided Mann-Whitney):")
-        pc = power_curve(deltas)
+        pc = power_curve(primary)
         print(pc.to_string(index=False, float_format=lambda v: f"{v:.2f}"))
     return 0
 

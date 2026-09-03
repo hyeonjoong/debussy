@@ -109,8 +109,8 @@ finite-variance distribution on acoustically very different material. Category C
 separates from both music categories with very large effect sizes on seven of
 the twelve quantities. The A-vs-B contrast is underpowered — nothing survives
 Benjamini–Hochberg correction, and at *n*=10 its δ values are unstable in sign:
-a released 150-per-group sensitivity draw separates on ten of twelve and
-reverses four. Two commercial lists [@LewisHodgson:2011] await licensing. The
+redrawn at 150 per group in the same bands, eleven of twelve separate and four
+reverse. Two commercial lists [@LewisHodgson:2011] await licensing. The
 manifest, parameter matrix, statistics and regenerating scripts are in
 `validation/` and described at
 <https://hyeonjoong.github.io/debussy/validation/>.
