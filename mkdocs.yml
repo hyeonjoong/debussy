@@ -16,6 +16,19 @@ markdown_extensions:
   - tables
   - pymdownx.details
   - pymdownx.superfences
+  # `docs/changelog.md` includes the repository-root CHANGELOG.md verbatim, so
+  # the site can never lag a release again (it had been frozen at a July stub
+  # through four releases). `check_paths` turns a broken include into a
+  # --strict build failure instead of a silently empty page.
+  #
+  # base_path is the repo root ONLY. Do not add `docs` in front of it: on a
+  # case-insensitive filesystem (macOS APFS) `docs/CHANGELOG.md` resolves to
+  # docs/changelog.md itself, the include becomes self-referential, snippets
+  # silently drops it, and the page renders empty — while passing --strict on
+  # Linux CI. Found the hard way on 2026-09-03.
+  - pymdownx.snippets:
+      base_path: [.]
+      check_paths: true
   - toc:
       permalink: true
 nav:
