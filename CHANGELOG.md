@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Power-sensitivity analysis for the A-vs-B contrast** (`validation/sensitivity_power.py`
+  plus two 300-track matrices in `validation/data/`). The 60-track benchmark
+  reports that nothing survives Benjamini-Hochberg correction, which on its own
+  cannot distinguish "the parameters do not separate these categories" from
+  "this design cannot see effects of that size". Simulated power at the observed
+  effect sizes puts the published design at **11-30 %**, so the null was
+  uninformative. A 150-per-group draw from the same DEAM pool, by a stated rule
+  and the same 45 s standardisation, separates on **ten of twelve** with
+  *q* < 0.001; an independent FMA draw (ambient/drone/minimal against the rest,
+  compared only within FMA) agrees with it on ten of twelve signs.
+
+### Changed
+- **The paper, the docs and `validation/README.md` now say that the published
+  A-vs-B effect sizes are unstable in sign** and must not be read as findings.
+  Four of them — LAeq, spectral centroid, sharpness, spectral flatness — are
+  positive at *n*=10 and strongly negative in both larger draws, which is the
+  direction the acoustics predict. **The released 60-track benchmark data is
+  unchanged**; this documents what it can and cannot support.
+
 ### Fixed
 - **The temporal-coverage metrics now read the reference-value constants
   instead of repeating them as literals.** `ROUGHNESS_REFERENCE_ASPER` and
