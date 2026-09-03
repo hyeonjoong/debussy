@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **The primary power-sensitivity arm** (`validation/data/parameters_sensitivity_narrow150.csv`).
+  The published arousal bands are held exactly fixed and 150 tracks per group are
+  drawn at random within each, so the only difference from the released
+  benchmark is *n*. **Eleven of twelve** A-vs-B contrasts survive
+  Benjamini-Hochberg, against zero of twelve in the benchmark drawn from the
+  identical population. This is the arm that separates "underpowered" from
+  "bands too narrow", and it settles it as the former: the published contrast
+  was real and could not be seen at *n*=10. `sensitivity_power.py` now reports
+  this arm first and marks the other two draws' sign agreement against it.
+
+
+### Added
 - **Power-sensitivity analysis for the A-vs-B contrast** (`validation/sensitivity_power.py`
   plus two 300-track matrices in `validation/data/`). The 60-track benchmark
   reports that nothing survives Benjamini-Hochberg correction, which on its own

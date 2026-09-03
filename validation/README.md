@@ -30,9 +30,10 @@ All audio was standardised to 44.1 kHz mono 16-bit PCM WAV before analysis.
 | `data/run_metadata.json` | Category counts and timing for the published run (2026-05-27) |
 | `run_validation.py` | Manifest + audio → parameter matrix |
 | `analyze_results.py` | Parameter matrix → summary statistics + distribution figure |
-| `data/parameters_sensitivity_n150.csv` | Sensitivity draw: 150 DEAM tracks per group by annotated arousal, 45 s, same pipeline |
+| `data/parameters_sensitivity_narrow150.csv` | **Primary sensitivity arm**: 150 DEAM tracks per group drawn *within the published arousal bands*, 45 s, same pipeline — only *n* differs from the benchmark |
+| `data/parameters_sensitivity_n150.csv` | Wide-band draw: 150 DEAM tracks per group at the arousal extremes, 45 s |
 | `data/parameters_sensitivity_fma150.csv` | Independent-corpus draw: 150 FMA ambient/drone/minimal vs 150 other, 30 s |
-| `sensitivity_power.py` | Both draws → effect sizes, BH q, sign agreement, simulated power |
+| `sensitivity_power.py` | All three draws → effect sizes, BH q, sign agreement with the primary arm, simulated power |
 
 ## Reproducing
 
@@ -78,8 +79,9 @@ for every track so the standardisation step can be verified.
 - Group A is small (*n* = 10) and the A-vs-B contrast is underpowered — three
   parameters reach uncorrected *p* < 0.05 but none survive BH correction.
   **The δ signs at this sample size are not reliable** — see
-  `sensitivity_power.py` and the two 150-per-group draws in `data/`, which
-  separate on ten of twelve and reverse four of the signs
+  `sensitivity_power.py` and the three 150-per-group draws in `data/`. Within
+  the same bands, only *n* raised, eleven of twelve separate and four signs
+  reverse
   (smallest *q* = 0.19). Treat A-vs-B as exploratory.
 - Two commercial reference lists (Mindlab Top 10 and a clinical/research-cited
   relaxation set) are excluded pending separate licensing; adding them would
