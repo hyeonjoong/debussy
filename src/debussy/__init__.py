@@ -44,7 +44,7 @@ from ._tiers import (
     parameters_in_tier,
 )
 
-__version__ = "0.2.2"
+__version__ = "0.3.0"
 __all__ = [
     "analyze_audio",
     "analyse",

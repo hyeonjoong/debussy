@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-09-03
+
+Companion-review alignment and the power-sensitivity release. Every
+change below landed through a reviewed pull request (#3, #13, #14,
+#22–#24, #26–#30).
+
 ### Added
 - **The primary power-sensitivity arm** (`validation/data/parameters_sensitivity_narrow150.csv`).
   The published arousal bands are held exactly fixed and 150 tracks per group are
@@ -17,9 +23,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "bands too narrow", and it settles it as the former: the published contrast
   was real and could not be seen at *n*=10. `sensitivity_power.py` now reports
   this arm first and marks the other two draws' sign agreement against it.
-
-
-### Added
 - **Power-sensitivity analysis for the A-vs-B contrast** (`validation/sensitivity_power.py`
   plus two 300-track matrices in `validation/data/`). The 60-track benchmark
   reports that nothing survives Benjamini-Hochberg correction, which on its own
@@ -30,50 +33,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the same 45 s standardisation, separates on **ten of twelve** with
   *q* < 0.001; an independent FMA draw (ambient/drone/minimal against the rest,
   compared only within FMA) agrees with it on ten of twelve signs.
-
-### Changed
-- **The paper, the docs and `validation/README.md` now say that the published
-  A-vs-B effect sizes are unstable in sign** and must not be read as findings.
-  Four of them — LAeq, spectral centroid, sharpness, spectral flatness — are
-  positive at *n*=10 and strongly negative in both larger draws, which is the
-  direction the acoustics predict. **The released 60-track benchmark data is
-  unchanged**; this documents what it can and cannot support.
-
-### Fixed
-- **The temporal-coverage metrics now read the reference-value constants
-  instead of repeating them as literals.** `ROUGHNESS_REFERENCE_ASPER` and
-  `ATTACK_REFERENCE_MS` are documented as named constants so a protocol needing
-  different limits can state its own, but `roughness_coverage_pct` counted
-  frames above a hard-coded `0.3`, `sharp_onset_pct`/`sharp_onset_count`
-  counted onsets below a hard-coded `50.0`, and `coverage_items()` /
-  `plot_coverage()` printed those numbers as literal strings. Re-pointing a
-  constant therefore moved the Tier-1 mean check but not the coverage figure
-  graded against `ROUGHNESS_COVERAGE_CAUTION_PCT` /
-  `ROUGHNESS_COVERAGE_FAIL_PCT`, so a stimulus could be cautioned or failed
-  against a limit nobody had set. Default output is unchanged — the constants
-  hold the same values the literals did.
-- `attack_times_ms()` omitted the sharp-onset count key entirely on the
-  fewer-than-two-onsets path, where the other early return supplies it.
-- **A clip exactly one 50 ms window long no longer crashes `analyze_audio()`.**
-  `dynamic_range_db()` guarded only `len(y) < win`, but its frame loop stops
-  before `i = len(y) - win`, so at exactly one window it built an empty array
-  and `np.percentile` raised a bare `IndexError` — a clip one sample shorter or
-  longer analysed fine. Such a clip holds a single short-term RMS value, so it
-  now reports a 0 dB span, matching what the streaming long-file path already
-  returned when it collected no full window. Longer inputs are unaffected, so
-  the published benchmark values are unchanged.
-
-### Changed
-- **`attack_times_ms()` return keys renamed** `frac_below_50ms` →
-  `frac_below_reference_ms` and `n_below_50ms` → `n_below_reference_ms`. The old
-  names hard-coded a number the caller is invited to change. `Result` fields
-  (`sharp_onset_pct`, `sharp_onset_count`) are unaffected.
-- Code and API-doc prose describing these two numbers now calls them reference
-  values rather than thresholds, matching the constants block that already
-  said so. The `"threshold"` key returned by `coverage_items()` keeps its name;
-  only its rendered value is now derived from the constants.
-
-### Added
 - **Issue forms for bug reports and feature requests**
   (`.github/ISSUE_TEMPLATE/`). CONTRIBUTING already listed what a usable bug
   report contains — Python version, OS, `debussy.__version__`, a minimal
@@ -84,6 +43,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   case, which is the scope test CONTRIBUTING applies. Blank issues stay enabled.
 
 ### Changed
+- **The paper, the docs and `validation/README.md` now say that the published
+  A-vs-B effect sizes are unstable in sign** and must not be read as findings.
+  Four of them — LAeq, spectral centroid, sharpness, spectral flatness — are
+  positive at *n*=10 and strongly negative in both larger draws, which is the
+  direction the acoustics predict. **The released 60-track benchmark data is
+  unchanged**; this documents what it can and cannot support.
+- **`attack_times_ms()` return keys renamed** `frac_below_50ms` →
+  `frac_below_reference_ms` and `n_below_50ms` → `n_below_reference_ms`. The old
+  names hard-coded a number the caller is invited to change. `Result` fields
+  (`sharp_onset_pct`, `sharp_onset_count`) are unaffected.
+- Code and API-doc prose describing these two numbers now calls them reference
+  values rather than thresholds, matching the constants block that already
+  said so. The `"threshold"` key returned by `coverage_items()` keeps its name;
+  only its rendered value is now derived from the constants.
 - **Tier data is now a single source of truth** (`debussy._tiers`). Every
   parameter's four evidence scores, evidence class and design implication live
   in one table, and the tier is *derived* from them by the review's banding plus
@@ -133,6 +106,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   categories. Its reference-range paragraph also still called the values
   "directional guidance" and Tier 2 "soft", which the score audit had already
   replaced everywhere else.
+
+### Fixed
+- **The temporal-coverage metrics now read the reference-value constants
+  instead of repeating them as literals.** `ROUGHNESS_REFERENCE_ASPER` and
+  `ATTACK_REFERENCE_MS` are documented as named constants so a protocol needing
+  different limits can state its own, but `roughness_coverage_pct` counted
+  frames above a hard-coded `0.3`, `sharp_onset_pct`/`sharp_onset_count`
+  counted onsets below a hard-coded `50.0`, and `coverage_items()` /
+  `plot_coverage()` printed those numbers as literal strings. Re-pointing a
+  constant therefore moved the Tier-1 mean check but not the coverage figure
+  graded against `ROUGHNESS_COVERAGE_CAUTION_PCT` /
+  `ROUGHNESS_COVERAGE_FAIL_PCT`, so a stimulus could be cautioned or failed
+  against a limit nobody had set. Default output is unchanged — the constants
+  hold the same values the literals did.
+- `attack_times_ms()` omitted the sharp-onset count key entirely on the
+  fewer-than-two-onsets path, where the other early return supplies it.
+- **A clip exactly one 50 ms window long no longer crashes `analyze_audio()`.**
+  `dynamic_range_db()` guarded only `len(y) < win`, but its frame loop stops
+  before `i = len(y) - win`, so at exactly one window it built an empty array
+  and `np.percentile` raised a bare `IndexError` — a clip one sample shorter or
+  longer analysed fine. Such a clip holds a single short-term RMS value, so it
+  now reports a 0 dB span, matching what the streaming long-file path already
+  returned when it collected no full window. Longer inputs are unaffected, so
+  the published benchmark values are unchanged.
 
 ## [0.2.2] — 2026-08-10
 
