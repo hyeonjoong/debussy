@@ -60,7 +60,12 @@ def category_of(subcategory: str) -> str:
 
 def cliffs_delta(x, y) -> float:
     """Cliff's delta: P(x > y) - P(x < y). Positive means x tends to be larger."""
-    x, y = np.asarray(x), np.asarray(y)
+    x, y = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
+    # A NaN compares False both ways, so leaving it in would keep it in the
+    # denominator while contributing to neither count, silently pulling the
+    # delta towards zero. Callers here drop NaNs already; drop them again so
+    # the function's contract does not depend on that.
+    x, y = x[~np.isnan(x)], y[~np.isnan(y)]
     if x.size == 0 or y.size == 0:
         return float("nan")
     greater = (x[:, None] > y[None, :]).sum()
