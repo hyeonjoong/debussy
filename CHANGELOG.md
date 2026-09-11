@@ -7,6 +7,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `beat_agreement()` and `onset_flux()`, with reference constants
+  `BEAT_AGREEMENT_REFERENCE`, `ONSET_FLUX_REFERENCE` and
+  `TEMPO_TEST_MIN_DURATION_S`, deciding whether a tempo estimate applies to a
+  signal at all (#31). `Result` gains `beat_agreement` and `onset_flux`, both
+  reported beside `tempo_bpm` so a withheld tempo carries the evidence for
+  withholding it.
+- `tests/test_tempo_applicability.py`: fifteen synthesised signals whose answer
+  is fixed by construction, checked at four excerpt lengths. The public tempo
+  benchmarks annotate a wide range of tempi but contain almost no material with
+  no tempo, so the beatless class has to be constructed rather than found.
+
+### Changed
+
+- `tempo_bpm()` returns `None` unless both conditions hold. A beat tracker
+  returns a number for any input; given material with no recurring onsets it
+  returns the mode of its own tempo prior, which reads as a confident estimate
+  and is an artefact. Pass both statistics as `None` for the unchecked
+  estimate.
+- Validated against the 998 GTZAN tracks carrying human tempo annotations
+  (Marchand & Peeters). The rule withholds tempo from 15.2 per cent of them and
+  raises the accuracy of the tempi still reported, measured against those
+  annotations with octave and 3:2 relations allowed, from 92.1 to 97.4 per
+  cent. Over a third of the withheld tracks carried an estimate that did not
+  match the annotation in any case.
+- On the 60-track validation corpus the rule withholds tempo from all 20
+  beatless sleep-audio tracks and from 10 of the 40 music tracks. No other
+  parameter is affected: checked by recomputing the published matrix, where
+  all fourteen non-tempo numeric columns agree to within 0.0000 per cent.
+  Analysis cost rises by about 0.4 s per 45 s excerpt.
+- Withholding costs about 1.7 correct tempi for each incorrect one it
+  suppresses, and is concentrated in slow, rubato and non-percussive material:
+  classical loses 48 per cent of tracks and jazz 29, against 4 to 14 per cent
+  elsewhere. That follows difficulty rather than genre, since the unchecked
+  estimator was right on only 62 per cent of the withheld classical tracks
+  against 96 per cent of those kept. Both statistics are reported in `Result`
+  and the check is opt-out, so nothing is lost that a caller wants to keep.
+
+### Notes
+
+Method after Holzapfel, Davies, Zapata, Oliveira & Gouyon (2012), "Selective
+sampling for beat tracking evaluation", IEEE TASLP 20(9), 2539-2548: mutual
+agreement between independent trackers identifies material on which beat
+tracking fails, without ground truth.
+
+Single statistics computed from one onset envelope were tried first and do not
+work. Onset density is actively misleading, scoring broadband noise above
+music. Autocorrelation peak prominence, tempogram contrast, onset flux alone
+and window-to-window tempo agreement each separate the synthetic controls but
+reject 87 per cent or more of annotated music at any threshold that also
+rejects the controls. The pulse-clarity model of Lartillot, Eerola, Toiviainen
+& Fornari (2008) grades how clear an existing pulse is and is not an
+applicability test: a sustained tone has a near-constant onset envelope whose
+autocorrelation stays high at every lag.
+
+Agreement alone is not enough either, and not length-stable: a tone under very
+slow amplitude modulation has almost no onsets, but every committee member
+locks onto the same swell, so they agree with each other while agreeing about
+nothing in the signal, and it crosses the agreement reference at some excerpt
+lengths and not others. Onset flux separates that case with a wide margin and
+at no cost, since sustained tones, chords and slow swells reach 0.086 at most
+while the lowest of the 998 annotated tracks is 0.609, and the condition
+withholds none of them.
+
+Both statistics are computed after resampling to a fixed internal rate, and
+flux is the mean onset envelope rather than that mean divided by signal RMS.
+The RMS normalisation looks natural and is wrong: the envelope is a difference
+of log-magnitude spectra and already carries no level dependence, so dividing
+by RMS introduces one, and a click train raised 12 dB would lose its tempo.
+The hop length is fixed in samples, so without resampling the envelope mean of
+one click train spans 0.165 to 0.665 across 16 to 48 kHz. Tests cover both
+invariances.
+
 ## [0.3.0] — 2026-09-03
 
 Companion-review alignment and the power-sensitivity release. Every

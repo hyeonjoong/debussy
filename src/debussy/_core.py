@@ -54,7 +54,7 @@ import os
 import sys
 import warnings
 from dataclasses import dataclass, asdict, field
-from typing import Optional
+from typing import Optional, Tuple
 
 import numpy as np
 import soundfile as sf
@@ -174,7 +174,190 @@ def attack_times_ms(y: np.ndarray, fs: int, librosa) -> dict:
 
 # ---------- Tempo / modulation rate ----------
 
-def tempo_bpm(y: np.ndarray, fs: int, librosa) -> Optional[float]:
+#: Minimum mean mutual agreement for a tempo to be reported.
+#:
+#: Set by the beatless class rather than tuned for coverage: it is the lowest
+#: value that rejects every aperiodic signal in
+#: ``tests/test_tempo_applicability.py`` (highest such signal 0.690) and every
+#: track in the beatless half of the validation corpus (highest 0.686).
+#:
+#: Against the 998 GTZAN tracks carrying human tempo annotations (Marchand &
+#: Peeters), the rule withholds tempo from 15.2 per cent of them and raises the
+#: accuracy of the tempi still reported, measured against those annotations
+#: with octave and 3:2 relations allowed, from 92.1 to 97.4 per cent.
+#:
+#: That trade is worth stating rather than only the headline. Withholding
+#: removes 95 tempi that did match the annotation along with 57 that did not,
+#: so it costs about 1.7 correct values for each incorrect one it suppresses.
+#: It is the right default for a reporting tool, where an unmarked wrong value
+#: propagates and a missing one does not, but it is a default: pass both
+#: statistics as ``None`` to :func:`tempo_bpm` for the unchecked estimate, and
+#: both are reported in :class:`Result` so a different threshold can be
+#: applied downstream.
+#:
+#: Withholding is not evenly spread across material, and the pattern follows
+#: difficulty rather than genre as such. Classical loses 48 per cent of tracks
+#: and jazz 29, against 4 to 14 for the remaining eight genres; but on the
+#: withheld classical tracks the unchecked estimator was right only 62 per
+#: cent of the time, against 96 on the ones kept, and classical has the lowest
+#: unchecked accuracy of any genre at 80 per cent. Slow, rubato and
+#: non-percussive material is where tempo estimation actually fails, and it is
+#: also common in relaxation and sleep audio, so users working with that
+#: repertoire should expect a high proportion of absent tempi. No lower
+#: threshold avoids this: at 0.65 classical still loses 42 per cent while a
+#: quarter of the beatless corpus starts passing.
+BEAT_AGREEMENT_REFERENCE = 0.69
+
+#: Minimum onset flux for a tempo to be reported: the mean of the
+#: onset-strength envelope. The envelope is a difference of log-magnitude mel
+#: spectra, so this is invariant to playback level; it is computed after
+#: resampling to :data:`_TEMPO_TEST_SR`, which makes it invariant to input
+#: sample rate as well.
+#:
+#: Agreement alone is not enough. A tone under very slow amplitude modulation
+#: has almost no onsets, but every committee member locks onto the same swell,
+#: so they agree with each other while agreeing about nothing in the signal,
+#: and it crosses the agreement reference at some excerpt lengths and not
+#: others. Flux separates that case with a wide margin and at no cost:
+#: sustained tones, chords and slow swells reach 0.086 at most, while the
+#: lowest of the 998 annotated GTZAN tracks is 0.609, and the condition
+#: withholds none of them.
+ONSET_FLUX_REFERENCE = 0.15
+
+#: Internal sample rate for the tempo applicability statistics. Both are
+#: computed on audio resampled to this rate so that the same signal gives the
+#: same answer whatever rate it arrives at: librosa's onset envelope uses a
+#: hop length fixed in samples, so at native rates the envelope means of one
+#: click train span 0.165 to 0.665 across 16-48 kHz, against 0.439 to 0.442
+#: once resampled.
+_TEMPO_TEST_SR = 22050
+
+#: Shortest excerpt for which the applicability test was validated. Below this
+#: the committee has too few beats to agree or disagree about; the test is
+#: still applied, since reporting an unchecked tempo is the worse failure, but
+#: results on shorter excerpts are outside what has been verified.
+TEMPO_TEST_MIN_DURATION_S = 15.0
+
+
+def _beat_f_measure(ref: np.ndarray, est: np.ndarray, tol: float = 0.07) -> float:
+    """Beat-tracking F-measure between two beat sequences, 70 ms tolerance."""
+    if len(ref) == 0 or len(est) == 0:
+        return 0.0
+    used = np.zeros(len(est), dtype=bool)
+    tp = 0
+    for r in ref:
+        d = np.abs(est - r)
+        d[used] = np.inf
+        j = int(np.argmin(d))
+        if d[j] <= tol:
+            tp += 1
+            used[j] = True
+    prec, rec = tp / len(est), tp / len(ref)
+    return 0.0 if prec + rec == 0 else 2 * prec * rec / (prec + rec)
+
+
+def _to_test_rate(y: np.ndarray, fs: int, librosa):
+    """Resample to the fixed internal rate used by both applicability statistics."""
+    if fs == _TEMPO_TEST_SR:
+        return y, fs
+    return librosa.resample(np.asarray(y, dtype=np.float32), orig_sr=fs,
+                            target_sr=_TEMPO_TEST_SR), _TEMPO_TEST_SR
+
+
+def onset_flux(y: np.ndarray, fs: int, librosa) -> Optional[float]:
+    """Mean of the onset-strength envelope: how much spectral change is present.
+
+    The envelope is a difference of log-magnitude mel spectra, so the value
+    does not move with playback level. Dividing it by signal RMS, which looks
+    like the natural normalisation, would reintroduce exactly the level
+    dependence it already lacks.
+    """
+    try:
+        y, fs = _to_test_rate(y, fs, librosa)
+        env = librosa.onset.onset_strength(y=y, sr=fs)
+        return float(env.mean()) if np.any(env) else 0.0
+    except Exception:
+        return None
+
+
+def beat_agreement(y: np.ndarray, fs: int, librosa) -> Optional[float]:
+    """Mean pairwise agreement between beat sequences from several trackers.
+
+    A beat tracker returns a number for any input. Given material with no
+    recurring onsets it returns the mode of its own tempo prior, which reads as
+    a confident estimate and is an artefact of the peak-picker rather than a
+    property of the signal. Committee agreement is the established way to
+    detect that without ground truth: where a beat grid exists, trackers
+    starting from different features recover the same one; where none exists,
+    each follows its own artefact and they disagree.
+
+    Members differ in onset feature (default spectral flux, a 32-band mel
+    variant, a lagged variant) and in tracker (dynamic-programming beat
+    tracking for the first three, peak-picking on the predominant-local-pulse
+    curve for the fourth). Agreement is the mean pairwise beat F-measure at the
+    conventional 70 ms tolerance, so the value is bounded in [0, 1].
+
+    After Holzapfel, Davies, Zapata, Oliveira & Gouyon (2012), "Selective
+    sampling for beat tracking evaluation", IEEE TASLP 20(9), 2539-2548, who
+    use mutual agreement between independent trackers to identify pieces on
+    which beat tracking fails.
+
+    Single statistics computed from one onset envelope were tried first and do
+    not work. Onset density is actively misleading, scoring broadband noise
+    above music. Autocorrelation peak prominence, tempogram contrast and
+    window-to-window tempo agreement each separate the synthetic controls but
+    reject 87 per cent or more of annotated music at any threshold that also
+    rejects the controls. The pulse-clarity model of Lartillot, Eerola,
+    Toiviainen & Fornari (2008) grades how clear an existing pulse is and is
+    not an applicability test: a sustained tone has a near-constant onset
+    envelope whose autocorrelation stays high at every lag.
+    """
+    try:
+        y, fs = _to_test_rate(y, fs, librosa)
+        envs = [
+            librosa.onset.onset_strength(y=y, sr=fs),
+            librosa.onset.onset_strength(y=y, sr=fs, n_mels=32),
+            librosa.onset.onset_strength(y=y, sr=fs, lag=2),
+        ]
+        seqs = []
+        for env in envs:
+            if not np.any(env):
+                continue
+            _, beats = librosa.beat.beat_track(onset_envelope=env, sr=fs,
+                                               units="time")
+            if len(beats) > 2:
+                seqs.append(np.asarray(beats, dtype=float))
+        if np.any(envs[0]):
+            pulse = librosa.beat.plp(onset_envelope=envs[0], sr=fs)
+            idx = librosa.util.peak_pick(pulse, pre_max=5, post_max=5,
+                                         pre_avg=5, post_avg=5, delta=0.05,
+                                         wait=5)
+            beats = librosa.frames_to_time(idx, sr=fs)
+            if len(beats) > 2:
+                seqs.append(np.asarray(beats, dtype=float))
+        if len(seqs) < 2:
+            return 0.0
+        vals = [_beat_f_measure(seqs[i], seqs[j])
+                for i in range(len(seqs)) for j in range(i + 1, len(seqs))]
+        return float(np.mean(vals)) if vals else 0.0
+    except Exception:
+        return None
+
+
+def tempo_bpm(y: np.ndarray, fs: int, librosa,
+              agreement: Optional[float] = None,
+              flux: Optional[float] = None) -> Optional[float]:
+    """Dominant tempo in BPM, or ``None`` when no stable pulse is present.
+
+    Withheld when either supplied statistic falls below its reference value.
+    An absent tempo states "no stable pulse" honestly, where a number would
+    assert a periodicity the signal does not have. Pass both as ``None`` for
+    the raw estimate with no applicability test.
+    """
+    if agreement is not None and agreement < BEAT_AGREEMENT_REFERENCE:
+        return None
+    if flux is not None and flux < ONSET_FLUX_REFERENCE:
+        return None
     try:
         t = librosa.feature.tempo(y=y, sr=fs)
         return float(np.atleast_1d(t)[0])
@@ -367,6 +550,10 @@ class Result:
     delivery: str
     spectral_flatness: float
     crest_factor_db: Optional[float] = None
+    # Applicability of tempo_bpm, reported alongside it rather than hidden, so
+    # a withheld tempo carries the evidence for withholding it.
+    beat_agreement: Optional[float] = None
+    onset_flux: Optional[float] = None
     # --- Temporal coverage (exploratory; additive — does NOT alter the 12
     # headline parameters or the validation benchmark). Each reports the
     # PROPORTION of the stimulus that sits beyond a Tier-1 reference value, so a
@@ -421,6 +608,7 @@ _NDIG = {
     "laeq_dbfs_a": 2, "dynamic_range_db": 2, "crest_factor_db": 2,
     "attack_mean_ms": 2, "attack_median_ms": 2, "attack_sd_ms": 2,
     "roughness_asper": 3, "tempo_bpm": 1, "modulation_peak_hz": 3,
+    "beat_agreement": 3, "onset_flux": 2,
     "spectral_centroid_hz": 1, "sharpness_acum": 3, "spectral_slope_beta": 3,
     "hnr_db": 2, "spectral_flatness": 4,
 }
@@ -454,7 +642,9 @@ def _result_from_signal(y: np.ndarray, fs: int, file: str, duration_s: float,
         )
 
     att = attack_times_ms(y, fs, librosa)
-    bpm = tempo_bpm(y, fs, librosa)
+    agree = beat_agreement(y, fs, librosa)
+    oflux = onset_flux(y, fs, librosa)
+    bpm = tempo_bpm(y, fs, librosa, agreement=agree, flux=oflux)
     mod = modulation_peak_hz(y, fs)
     sc = spectral_centroid_hz(y, fs, librosa)
     sl = spectral_slope(y, fs)
@@ -485,6 +675,8 @@ def _result_from_signal(y: np.ndarray, fs: int, file: str, duration_s: float,
         attack_sd_ms=round(att["sd_ms"], 2) if att["sd_ms"] is not None else None,
         roughness_asper=round(psy["roughness_asper"], 3) if psy["roughness_asper"] is not None else None,
         tempo_bpm=round(bpm, 1) if bpm is not None else None,
+        beat_agreement=round(agree, 3) if agree is not None else None,
+        onset_flux=round(oflux, 2) if oflux is not None else None,
         modulation_peak_hz=round(mod, 3) if mod is not None else None,
         spectral_centroid_hz=round(sc, 1),
         sharpness_acum=round(psy["sharpness_acum"], 3) if psy["sharpness_acum"] is not None else None,
@@ -589,6 +781,8 @@ def _aggregate_probes(results: list, file: str, duration_s: float, fs: int,
         attack_sd_ms=med("attack_sd_ms"),
         roughness_asper=med("roughness_asper"),
         tempo_bpm=med("tempo_bpm"),
+        beat_agreement=med("beat_agreement"),
+        onset_flux=med("onset_flux"),
         modulation_peak_hz=med("modulation_peak_hz"),
         spectral_centroid_hz=med("spectral_centroid_hz") or 0.0,
         sharpness_acum=med("sharpness_acum"),
@@ -689,6 +883,8 @@ def print_report(r: Result) -> None:
         ("   Onsets detected",              r.attack_n_onsets),
         ("3. Roughness (asper)",            r.roughness_asper),
         ("4. Tempo (BPM)",                  r.tempo_bpm),
+        ("   Beat agreement",               r.beat_agreement),
+        ("   Onset flux",                   r.onset_flux),
         ("   Modulation peak (Hz)",         r.modulation_peak_hz),
         ("5. Spectral centroid (Hz)",       r.spectral_centroid_hz),
         ("6. Sharpness (acum)",             r.sharpness_acum),
