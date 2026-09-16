@@ -58,7 +58,13 @@ the caller, since no analyser can determine them.
 | 8 | Harmonicity / HNR | dB | `hnr_db` |
 | 9 | Lyrics presence | yes/no | `lyrics` *(caller-supplied)* |
 | 10 | Delivery method | categorical | `delivery` *(caller-supplied)* |
-| 11 | Spectral flatness | [0, 1] | `spectral_flatness` |
+| 11 | Spectral flatness | [0, 1] | `spectral_flatness` (unweighted; see note) |
+
+Item 11 is reported as the unweighted geometric-to-arithmetic mean ratio, a
+measure of tonality. The reporting set recommends the perceptual variant, in
+which the energy at each frequency is weighted by the masking energy there
+(Bosi & Goldberg, 2003, p. 218). That variant requires a masking model and is
+not implemented here; the value returned should not be read as perceptual.
 
 `Result` additionally carries crest factor and temporal-coverage descriptors as
 diagnostics beyond the guideline.

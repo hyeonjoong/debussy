@@ -1272,11 +1272,17 @@ def tier3_items(r: Result) -> list[dict]:
     else:
         interp = "Noise-like"
     items.append({
-        "parameter": "Spectral flatness",
+        "parameter": "Spectral flatness (unweighted)",
         "value": _fmt(v, n=4),
         "unit": "",
         "interpretation": interp,
-        "note": "Proposed descriptor — autonomic evidence pending (Bosi & Goldberg, 2003)",
+        "note": "Proposed descriptor, autonomic evidence pending. Unweighted "
+                "geometric-to-arithmetic mean ratio, a measure of tonality "
+                "rather than of a perceptual attribute. The reporting set "
+                "recommends the perceptual variant, in which the energy at "
+                "each frequency is weighted by the masking energy there "
+                "(Bosi & Goldberg, 2003, p. 218); that variant needs a "
+                "masking model and is not implemented yet",
     })
     return items
 
