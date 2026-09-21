@@ -25,6 +25,8 @@ from ._core import (
     # Tier framework
     beat_agreement,
     onset_flux,
+    timing_regularity,
+    modulation_peak,
     BEAT_AGREEMENT_REFERENCE,
     ONSET_FLUX_REFERENCE,
     tier1_items,
@@ -57,6 +59,8 @@ __all__ = [
     "write_csv",
     "beat_agreement",
     "onset_flux",
+    "timing_regularity",
+    "modulation_peak",
     "BEAT_AGREEMENT_REFERENCE",
     "ONSET_FLUX_REFERENCE",
     "tier1_items",
