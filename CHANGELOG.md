@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- CI runs the test matrix on Python 3.13 and 3.14, and the matching
+  classifiers are declared (#20). `requires-python` has always been `>=3.10`
+  with no upper bound, so pip installed on both and nothing verified that
+  the package ran. Both pass on Linux and macOS; the matrix was added first
+  and the classifiers only after reading the result.
+
 ## [0.4.0] — 2026-09-21
 
 ### Added
