@@ -71,7 +71,17 @@ two stimuli matched for mean tempo can differ only in the latter.
 signal steps straight to digital silence, which happens when events are cut
 rather than faded. Such a step is broadband, so it is audible as a click and is
 detected as an onset, which inflates the onset count and every interval
-statistic derived from it. Read it before reading `ioi_cv`.
+statistic derived from it. Read it before reading `ioi_cv`. `abrupt_endings`
+is its companion and answers the question the other way round, by counting
+endings the onset detector actually fires on: a fade short enough to remove
+the step can still leave an ending that reaches the statistics, so a clean
+bill needs both at zero.
+
+`event_rate_per_min` is 60 over the median inter-onset interval, reported
+beside `tempo_bpm`. Where each beat carries one event the two agree; where
+the timing is jittered the interval median holds and the envelope estimate
+does not; where a beat carries several events the interval median tracks the
+subdivision. Their ratio is the reading, not either alone.
 
 Item 11 is reported as the unweighted geometric-to-arithmetic mean ratio, a
 measure of tonality. The reporting set recommends the perceptual variant, in

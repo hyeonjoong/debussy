@@ -9,13 +9,18 @@ in the same set were cut in the same way but had decayed to -62 dB first, so
 there was no click and no spurious onset.
 
 The stimuli here reproduce that construction, so the expected click count is
-fixed by how the signal is built.
+fixed by how the signal is built. Two checks are covered: truncation_clicks
+measures the waveform and says how audible the cut is, abrupt_endings
+measures whether the ending reaches the onset statistics. They disagree on a
+briefly faded high-level cut, which is the case that motivated the second.
 """
 import numpy as np
 import pytest
 
 from debussy._core import (
     TRUNCATION_FLOOR_DB,
+    abrupt_endings,
+    event_rate_per_min,
     timing_regularity,
     truncation_clicks,
 )
@@ -118,6 +123,90 @@ def test_clicks_corrupt_timing_regularity(librosa_mod):
     assert r_faded["npvi"] < 5.0
     assert r_cut["ioi_cv"] > 5 * r_faded["ioi_cv"]
     assert r_cut["npvi"] > 5 * r_faded["npvi"]
+
+
+def test_fade_can_clear_the_step_and_leave_the_onset(librosa_mod):
+    """The case the waveform check cannot see, and why the second one exists.
+
+    A 5 ms fade on an event cut at a high level drops the last audible sample
+    below the truncation floor, so no step is reported, while the transition
+    is still fast relative to the analysis window and is still detected as an
+    onset. Measured on real stimuli before it was reproduced here: piano
+    events cut at -20 dB reported zero truncation clicks at a 5 ms fade and
+    still returned twice the true onset count.
+    """
+    y = _sequence(cut_level=0.3, fade_ms=5.0)     # cut high, faded briefly
+
+    assert truncation_clicks(y, SR)["n"] == 0
+    r = abrupt_endings(y, SR, librosa_mod)
+    assert r["n_transitions"] == N_EVENTS
+    # A lower bound, not an inventory: backtracking carries some onsets past
+    # the window. What has to hold is that the file is flagged at all.
+    assert 0 < r["n"] <= N_EVENTS
+    assert len(librosa_mod.onset.onset_detect(
+        y=y, sr=SR, units="time", backtrack=True)) > N_EVENTS
+
+    long_fade = _sequence(cut_level=0.3, fade_ms=25.0)
+    assert abrupt_endings(long_fade, SR, librosa_mod)["n"] == 0
+
+
+def test_abrupt_endings_tracks_the_onset_count(librosa_mod):
+    """Flagged exactly when the onset count is actually corrupted."""
+    for cut, fade, corrupt in [(0.3, 0.0, True), (0.3, 5.0, True),
+                               (0.3, 25.0, False), (0.001, 0.0, False)]:
+        y = _sequence(cut_level=cut, fade_ms=fade)
+        n_on = len(librosa_mod.onset.onset_detect(y=y, sr=SR, units="time",
+                                                  backtrack=True))
+        flagged = (truncation_clicks(y, SR)["n"] > 0
+                   or abrupt_endings(y, SR, librosa_mod)["n"] > 0)
+        assert flagged is corrupt, (cut, fade, n_on)
+
+
+def test_onset_after_the_gap_is_not_an_ending(librosa_mod):
+    """Audio resuming after a short silence must not count as an abrupt end.
+
+    This is the false positive the window is asymmetric to avoid: in real
+    recordings a brief dropout is followed by the signal starting again, and
+    that start is a genuine onset sitting a few milliseconds after the
+    transition.
+    """
+    ev = _event(cut_level=1e-4, fade_ms=20.0)     # ends inaudibly, no click
+    gap = int(0.02 * SR)
+    y = np.concatenate([ev, np.zeros(gap), ev]).astype(np.float32)
+    y = 0.7 * y / (np.abs(y).max() + 1e-12)
+
+    r = abrupt_endings(y, SR, librosa_mod)
+    assert r["n_transitions"] >= 1
+    assert r["n"] == 0
+
+
+def test_event_rate_survives_jitter(librosa_mod):
+    """The interval rate holds where the envelope estimate degrades.
+
+    Both are reported because they answer different questions; this asserts
+    only that the interval rate recovers the constructed rate on a jittered
+    sequence, which is the case the envelope method handles badly.
+    """
+    rng = np.random.default_rng(11)
+    ev = _event(cut_level=1e-4, fade_ms=20.0)
+    iois = IOI * (1.0 + rng.uniform(-0.2, 0.2, N_EVENTS))
+    iois *= IOI / iois.mean()                      # hold the mean rate
+    times = np.concatenate([[0.0], np.cumsum(iois)[:-1]])
+    y = np.zeros(int((times[-1] + 1.0) * SR))
+    for t in times:
+        i = int(t * SR)
+        y[i:i + len(ev)] += ev
+    y = (0.7 * y / (np.abs(y).max() + 1e-12)).astype(np.float32)
+
+    r = timing_regularity(y, SR, librosa_mod)
+    assert r["ioi_cv"] > 0.05                      # jitter is present
+    assert event_rate_per_min(r["ioi_median_s"]) == pytest.approx(
+        60.0 / IOI, rel=0.06)
+
+
+def test_event_rate_handles_missing_input():
+    assert event_rate_per_min(None) is None
+    assert event_rate_per_min(0.0) is None
 
 
 def test_continuous_audio_is_not_flagged():

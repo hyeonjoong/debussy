@@ -404,11 +404,11 @@ def truncation_clicks(y: np.ndarray, fs: int) -> dict:
     piano events, cut at -20 dB, still produced one spurious onset each until
     the fade reached about 20 ms.
 
-    A zero count therefore does not by itself certify the endings. This
-    function detects a step into digital silence; it does not detect an ending
-    that is faded but still abrupt enough to register as a spectral change.
-    After fading, confirm that the detected onset count matches the intended
-    event count before trusting the interval statistics.
+    A zero count does not by itself certify the endings, because this
+    function measures the waveform rather than the consequence: a 5 ms fade
+    drops the last audible sample below the floor while the transition can
+    still be fast enough to be detected as an onset. :func:`abrupt_endings`
+    covers that case, and a clean bill needs both to be zero.
     """
     y = np.asarray(y, dtype=float)
     empty = {"n": 0, "max_step_db": None}
@@ -431,6 +431,93 @@ def truncation_clicks(y: np.ndarray, fs: int) -> dict:
         return empty
     step = float(np.abs(y[hit]).max() / peak)
     return {"n": int(hit.size), "max_step_db": float(20.0 * np.log10(step))}
+
+
+
+#: Window, in milliseconds relative to the end of the audible signal, in which
+#: a detected onset is attributed to the ending rather than to whatever comes
+#: next.
+#:
+#: The window is asymmetric because the two cases sit on opposite sides. An
+#: ending that clicks is detected at the transition or, since onset detection
+#: backtracks to the preceding energy minimum, shortly before it. Audio
+#: resuming after a brief dropout is detected shortly after. Measured across
+#: 2,921 silence transitions drawn from constructed stimuli, real stimulus
+#: sets and the 60-track validation corpus, this window captures 97.5 per
+#: cent of the endings in files whose onset count is demonstrably corrupted
+#: and none of the transitions in files that are not. Widening the lower
+#: bound to -40 ms adds one percentage point of the former and the first of
+#: the latter, which is the wrong trade: telling someone their clean stimulus
+#: is broken costs more than missing one ending in a file already flagged by
+#: the others.
+ABRUPT_ENDING_WINDOW_MS = (-30.0, 2.5)
+
+
+def abrupt_endings(y: np.ndarray, fs: int, librosa,
+                   onsets_s: Optional[np.ndarray] = None) -> dict:
+    """Count endings that the onset detector fires on.
+
+    :func:`truncation_clicks` asks what the waveform does, and answers it by
+    the level at which the signal is cut. That is the right question for
+    whether a click is audible, and the wrong one for whether the onset
+    statistics can be trusted, because the two come apart. Fading an event
+    over 5 ms drops the last audible sample far below the truncation floor,
+    so no click is reported, while the transition is still fast relative to
+    the analysis window and still produces an onset: in the stimuli that
+    prompted this, the piano files at a 5 ms fade reported zero truncation
+    clicks and still returned twice the true onset count.
+
+    So this asks the question that matters directly. It finds every point
+    where audible signal gives way to sustained digital silence, and counts
+    those coinciding with a detected onset. An ending that is detected as an
+    onset will inflate the event count and every interval statistic derived
+    from it, whatever the waveform looks like.
+
+    Reported alongside :func:`truncation_clicks`, not instead of it: the
+    truncation count and step size say what is wrong with the file and how
+    audible it is, this says whether it reaches the numbers. A clean bill
+    needs both to be zero.
+
+    Returns the count and the number of silence transitions examined. The
+    count is a conservative lower bound on how many endings are reaching the
+    statistics, for the reason given at :data:`ABRUPT_ENDING_WINDOW_MS`:
+    where backtracking carries the onset far enough back, the ending is
+    missed. Read it as evidence that the endings need fixing, not as an
+    inventory of which ones. Pass ``onsets_s`` to reuse onsets already
+    detected elsewhere.
+    """
+    y = np.asarray(y, dtype=float)
+    empty = {"n": 0, "n_transitions": 0}
+    gap = max(int(_TRUNCATION_GAP_MS / 1000.0 * fs), 1)
+    if y.size < gap + 2:
+        return empty
+
+    quiet = np.abs(y) <= _DIGITAL_SILENCE
+    csum = np.concatenate(([0], np.cumsum(quiet.astype(np.int64))))
+    starts = np.arange(1, y.size - gap + 1)
+    run = (csum[starts + gap] - csum[starts]) == gap
+    # The transition is the last audible sample, not any sample inside silence.
+    ends = np.nonzero((~quiet[: len(run)]) & run)[0]
+    if ends.size == 0:
+        return empty
+
+    if onsets_s is None:
+        try:
+            onsets_s = librosa.onset.onset_detect(y=y, sr=fs, units="time",
+                                                  backtrack=True)
+        except Exception:
+            return {"n": 0, "n_transitions": int(ends.size)}
+    onsets_s = np.asarray(onsets_s, dtype=float)
+    if onsets_s.size == 0:
+        return {"n": 0, "n_transitions": int(ends.size)}
+
+    lo, hi = (v / 1000.0 for v in ABRUPT_ENDING_WINDOW_MS)
+    t_end = ends / float(fs)
+    nearest = onsets_s[np.argmin(np.abs(onsets_s[None, :] - t_end[:, None]),
+                                 axis=1)]
+    offset = nearest - t_end
+    return {"n": int(np.count_nonzero((offset >= lo) & (offset <= hi))),
+            "n_transitions": int(ends.size)}
 
 
 def timing_regularity(y: np.ndarray, fs: int, librosa) -> dict:
@@ -464,13 +551,14 @@ def timing_regularity(y: np.ndarray, fs: int, librosa) -> dict:
     were each cut off rather than faded, the resulting click was detected as a
     second onset per event and an isochronous sequence returned a coefficient
     of variation of 0.52 instead of about 0.01. Check
-    :func:`truncation_clicks` before reading these numbers; when it reports a
-    non-zero count, fix the stimulus rather than the statistic.
+    :func:`truncation_clicks` and :func:`abrupt_endings` before reading these
+    numbers; when either reports a non-zero count, fix the stimulus rather
+    than the statistic.
 
     Suggested by Kyurim Kang, who found that periodic and aperiodic stimuli
     matched for mean tempo were not separable by any descriptor then reported.
     """
-    empty = {"ioi_median_s": None, "ioi_cv": None, "npvi": None}
+    empty = {"ioi_median_s": None, "ioi_cv": None, "npvi": None, "onsets_s": None}
     try:
         onsets = librosa.onset.onset_detect(y=y, sr=fs, units="time",
                                             backtrack=True)
@@ -479,7 +567,7 @@ def timing_regularity(y: np.ndarray, fs: int, librosa) -> dict:
     d = np.diff(np.asarray(onsets, dtype=float))
     d = d[d > 0]
     if len(d) < 3:
-        return empty
+        return dict(empty, onsets_s=np.asarray(onsets, dtype=float))
     mean = float(d.mean())
     if mean <= 0:
         return empty
@@ -488,7 +576,36 @@ def timing_regularity(y: np.ndarray, fs: int, librosa) -> dict:
         "ioi_median_s": float(np.median(d)),
         "ioi_cv": float(d.std(ddof=1) / mean),
         "npvi": float(100.0 * pairs.mean()),
+        "onsets_s": np.asarray(onsets, dtype=float),
     }
+
+
+
+def event_rate_per_min(ioi_median_s: Optional[float]) -> Optional[float]:
+    """Events per minute, from the median inter-onset interval.
+
+    Reported beside :data:`Result.tempo_bpm`, which estimates periodicity from
+    the onset envelope, because the two answer different questions and come
+    apart exactly where it matters. On material with one event per beat they
+    agree. On jittered sequences the envelope estimate degrades badly while
+    the interval median does not: across the aperiodic stimuli that prompted
+    this, built with an inter-onset coefficient of variation near 0.12, the
+    envelope estimate missed the constructed tempo by a median of 12.3 BPM and
+    was withheld altogether for two of nine files, while the interval median
+    recovered it to within 0.8 BPM for all nine.
+
+    The converse holds on music, which is why this does not replace
+    ``tempo_bpm``. Where a beat carries several events the interval median
+    tracks the subdivision, not the beat: across the validation corpus this
+    figure runs a median of 2.3 times the envelope tempo. Their ratio is
+    therefore the useful reading. Near one, the events are the beat. Well
+    above one, either the material subdivides or the onsets include something
+    that is not an event, which is worth checking against
+    :func:`abrupt_endings` before interpreting either number.
+    """
+    if not ioi_median_s or ioi_median_s <= 0:
+        return None
+    return 60.0 / float(ioi_median_s)
 
 
 def modulation_peak(y: np.ndarray, fs: int) -> dict:
@@ -728,6 +845,8 @@ class Result:
     modulation_peak_prominence_db: Optional[float] = None
     # Timing regularity: whether recurring events are evenly spaced.
     truncation_clicks: Optional[int] = None
+    abrupt_endings: Optional[int] = None
+    event_rate_per_min: Optional[float] = None
     truncation_max_step_db: Optional[float] = None
     ioi_median_s: Optional[float] = None
     ioi_cv: Optional[float] = None
@@ -786,7 +905,8 @@ _NDIG = {
     "laeq_dbfs_a": 2, "dynamic_range_db": 2, "crest_factor_db": 2,
     "attack_mean_ms": 2, "attack_median_ms": 2, "attack_sd_ms": 2,
     "roughness_asper": 3, "tempo_bpm": 1, "modulation_peak_hz": 3,
-    "modulation_peak_prominence_db": 1, "truncation_max_step_db": 1, "ioi_median_s": 4, "ioi_cv": 3, "npvi": 1,
+    "modulation_peak_prominence_db": 1, "truncation_max_step_db": 1,
+    "event_rate_per_min": 1, "ioi_median_s": 4, "ioi_cv": 3, "npvi": 1,
     "beat_agreement": 3, "onset_flux": 2,
     "spectral_centroid_hz": 1, "sharpness_acum": 3, "spectral_slope_beta": 3,
     "hnr_db": 2, "spectral_flatness": 4,
@@ -827,6 +947,7 @@ def _result_from_signal(y: np.ndarray, fs: int, file: str, duration_s: float,
     mod = modulation_peak(y, fs)
     timing = timing_regularity(y, fs, librosa)
     trunc = truncation_clicks(y, fs)
+    abrupt = abrupt_endings(y, fs, librosa, onsets_s=timing.get('onsets_s'))
     sc = spectral_centroid_hz(y, fs, librosa)
     sl = spectral_slope(y, fs)
     flat = spectral_flatness(y, librosa)
@@ -838,6 +959,11 @@ def _result_from_signal(y: np.ndarray, fs: int, file: str, duration_s: float,
         notes.append("LAeq in dBFS-A (uncalibrated)")
     if clipped:
         notes.append(f"clipping: {n_clip} full-scale sample(s)")
+    if abrupt["n"] and not trunc["n"]:
+        notes.append(
+            f"{abrupt['n']} of {abrupt['n_transitions']} ending(s) detected as "
+            f"an onset: faded, but still fast enough to register, so onset "
+            f"count and IOI statistics are inflated")
     if trunc["n"]:
         notes.append(
             f"{trunc['n']} truncation click(s), largest step "
@@ -867,6 +993,10 @@ def _result_from_signal(y: np.ndarray, fs: int, file: str, duration_s: float,
         modulation_peak_prominence_db=(round(mod['prominence_db'], 1)
                                        if mod['prominence_db'] is not None else None),
         truncation_clicks=trunc['n'],
+        abrupt_endings=abrupt['n'],
+        event_rate_per_min=(round(_er, 1)
+                            if (_er := event_rate_per_min(timing['ioi_median_s']))
+                            is not None else None),
         truncation_max_step_db=(round(trunc['max_step_db'], 1)
                                 if trunc['max_step_db'] is not None else None),
         ioi_median_s=(round(timing['ioi_median_s'], 4)
@@ -982,6 +1112,8 @@ def _aggregate_probes(results: list, file: str, duration_s: float, fs: int,
         onset_flux=med("onset_flux"),
         modulation_peak_prominence_db=med("modulation_peak_prominence_db"),
         truncation_clicks=med("truncation_clicks"),
+        abrupt_endings=med("abrupt_endings"),
+        event_rate_per_min=med("event_rate_per_min"),
         truncation_max_step_db=med("truncation_max_step_db"),
         ioi_median_s=med("ioi_median_s"),
         ioi_cv=med("ioi_cv"),
@@ -1090,6 +1222,8 @@ def print_report(r: Result) -> None:
         ("   Onset flux",                   r.onset_flux),
         ("   Modulation peak prominence dB", r.modulation_peak_prominence_db),
         ("   Truncation clicks",            r.truncation_clicks),
+        ("   Abrupt endings",               r.abrupt_endings),
+        ("   Event rate (per min)",         r.event_rate_per_min),
         ("   IOI median (s)",               r.ioi_median_s),
         ("   IOI CV",                       r.ioi_cv),
         ("   nPVI",                         r.npvi),

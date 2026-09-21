@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `abrupt_endings()` with `ABRUPT_ENDING_WINDOW_MS`, and `event_rate_per_min()`.
+  `Result` gains `abrupt_endings` and `event_rate_per_min`. These close the two
+  limitations recorded against the previous entries.
+
+  `abrupt_endings` counts endings that the onset detector fires on, rather
+  than endings whose waveform steps. `truncation_clicks` asks what the
+  waveform does and answers by the level at the cut, which is right for
+  audibility and wrong for whether the statistics can be trusted: a 5 ms fade
+  drops the last audible sample below the truncation floor while the
+  transition is still fast enough to be detected, so the piano stimuli that
+  prompted this reported zero clicks at a 5 ms fade and still returned twice
+  the true onset count. Both are reported; a clean bill needs both at zero.
+  Calibrated on 2,921 silence transitions: the window captures 97.5 per cent
+  of endings in files whose onset count is demonstrably corrupted and none in
+  files that are not. Across 54 runs of the stimuli that prompted it (18
+  files at three fade lengths) the flag agrees with whether the onset count
+  is corrupted in every case, and no file in the 60-track validation corpus
+  is flagged.
+
+  `event_rate_per_min` reports 60 over the median inter-onset interval beside
+  `tempo_bpm`, which estimates periodicity from the onset envelope. The two
+  agree on material with one event per beat and come apart where it matters:
+  on jittered sequences with an interval coefficient of variation near 0.12
+  the envelope estimate missed the constructed tempo by a median of 12.3 BPM
+  and was withheld for two of nine files, while the interval median recovered
+  it to within 0.8 BPM for all nine. It does not replace `tempo_bpm`, because
+  on music the interval median tracks subdivisions, running a median of 2.3
+  times the envelope tempo across the validation corpus. Their ratio is the
+  reading: near one the events are the beat.
+
 - `truncation_clicks()`, counting points where audible signal steps straight
   to digital silence, with `TRUNCATION_FLOOR_DB`. `Result` gains
   `truncation_clicks` and `truncation_max_step_db`, and a non-zero count is
