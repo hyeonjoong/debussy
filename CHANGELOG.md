@@ -19,7 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of variation of 0.52 where the constructed value was zero. Metronome events
   in the same set were cut identically but had decayed to -62 dB first, so no
   click resulted. The level at the cut is what decides it, not the cut. Zero
-  false positives across the 60-track validation corpus.
+  false positives across the 60-track validation corpus. The check detects a
+  step into digital silence, not an ending that is faded but still abrupt, so
+  a zero count does not on its own certify the endings: in the same set a 5 ms
+  fade cleared the drum events but the piano events needed about 20 ms.
 
 - `timing_regularity()`, reporting `ioi_median_s`, `ioi_cv` and `npvi`, and
   `modulation_peak()`, which returns the modulation rate together with
