@@ -1,6 +1,6 @@
 # Installation
 
-DEBUSSY requires Python ≥ 3.10.
+DEBUSSY requires Python ≥ 3.10. Every release is tested on 3.10 through 3.14, on both Linux and macOS.
 
 ## From PyPI
 
