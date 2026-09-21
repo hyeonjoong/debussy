@@ -67,6 +67,12 @@ modulation rate is, and `ioi_cv` with `npvi` describe how evenly the events are
 spaced. Tempo and modulation rate answer how fast; these answer how evenly, and
 two stimuli matched for mean tempo can differ only in the latter.
 
+`truncation_clicks` is a stimulus-quality check: it counts points where audible
+signal steps straight to digital silence, which happens when events are cut
+rather than faded. Such a step is broadband, so it is audible as a click and is
+detected as an onset, which inflates the onset count and every interval
+statistic derived from it. Read it before reading `ioi_cv`.
+
 Item 11 is reported as the unweighted geometric-to-arithmetic mean ratio, a
 measure of tonality. The reporting set recommends the perceptual variant, in
 which the energy at each frequency is weighted by the masking energy there
