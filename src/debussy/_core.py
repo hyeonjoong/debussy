@@ -398,7 +398,17 @@ def truncation_clicks(y: np.ndarray, fs: int) -> dict:
     cut happened.
 
     Returns the count and the largest step, in dB relative to the file peak.
-    A fade of a few milliseconds at the end of each event removes both.
+    A short fade at the end of each event removes the step, but how short is
+    short enough depends on the level at the cut: in the set described above a
+    5 ms fade was sufficient for the drum events, cut at -32 dB, while the
+    piano events, cut at -20 dB, still produced one spurious onset each until
+    the fade reached about 20 ms.
+
+    A zero count therefore does not by itself certify the endings. This
+    function detects a step into digital silence; it does not detect an ending
+    that is faded but still abrupt enough to register as a spectral change.
+    After fading, confirm that the detected onset count matches the intended
+    event count before trusting the interval statistics.
     """
     y = np.asarray(y, dtype=float)
     empty = {"n": 0, "max_step_db": None}
