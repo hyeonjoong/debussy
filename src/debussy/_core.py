@@ -365,9 +365,77 @@ def tempo_bpm(y: np.ndarray, fs: int, librosa,
         return None
 
 
-def modulation_peak_hz(y: np.ndarray, fs: int) -> Optional[float]:
-    """Dominant amplitude-modulation rate (Hz) in 0.5–20 Hz range,
-    derived from the envelope spectrum."""
+def timing_regularity(y: np.ndarray, fs: int, librosa) -> dict:
+    """Inter-onset interval statistics: how evenly spaced the events are.
+
+    Tempo says how fast events recur and the modulation peak says at what rate
+    the envelope fluctuates. Neither says whether the recurrence is even, and
+    two stimuli built to the same mean tempo, one isochronous and one jittered,
+    can return the same value for both. These statistics separate them.
+
+    ``ioi_cv`` is the coefficient of variation of the intervals, the
+    conventional index of timing variability. ``npvi`` is the normalised
+    pairwise variability index, the mean absolute difference between
+    successive intervals as a percentage of their running mean; it responds to
+    local unevenness and, unlike the coefficient of variation, is largely
+    unaffected by a gradual change of tempo across the excerpt. Reporting both
+    distinguishes a piece that is locally even but speeds up from one that is
+    uneven throughout.
+
+    Onsets are detected with the same call used for the attack-time
+    distribution, so the two descriptions refer to the same events. Detection
+    is frame-based, so intervals are quantised to the analysis hop and a
+    perfectly isochronous sequence returns a small non-zero value rather than
+    exactly zero: about 0.01 for the coefficient of variation and 2 for nPVI
+    at the default settings. Read those as the floor of the measurement, not
+    as detected irregularity.
+
+    Suggested by Kyurim Kang, who found that periodic and aperiodic stimuli
+    matched for mean tempo were not separable by any descriptor then reported.
+    """
+    empty = {"ioi_median_s": None, "ioi_cv": None, "npvi": None}
+    try:
+        onsets = librosa.onset.onset_detect(y=y, sr=fs, units="time",
+                                            backtrack=True)
+    except Exception:
+        return empty
+    d = np.diff(np.asarray(onsets, dtype=float))
+    d = d[d > 0]
+    if len(d) < 3:
+        return empty
+    mean = float(d.mean())
+    if mean <= 0:
+        return empty
+    pairs = np.abs(d[:-1] - d[1:]) / ((d[:-1] + d[1:]) / 2.0)
+    return {
+        "ioi_median_s": float(np.median(d)),
+        "ioi_cv": float(d.std(ddof=1) / mean),
+        "npvi": float(100.0 * pairs.mean()),
+    }
+
+
+def modulation_peak(y: np.ndarray, fs: int) -> dict:
+    """Dominant amplitude-modulation rate and how well defined that peak is.
+
+    The rate alone does not say whether there is a peak worth reporting. A
+    jittered stimulus spreads its envelope energy across neighbouring rates, so
+    the argmax can land on a harmonic or on noise while still being returned as
+    a single confident number. ``prominence_db`` is the peak height over the
+    median of the analysis band, in decibels: near 0 dB when the envelope
+    spectrum is flat, and tens of decibels when one rate dominates. The ratio
+    itself spans several orders of magnitude between a metronome and a
+    jittered sequence, which is why it is reported logarithmically.
+
+    For scale: across the 60-track validation corpus the lowest prominence is
+    about 15 dB, jittered click sequences built to a fixed mean tempo reach 10
+    to 23 dB, and a signal with no envelope fluctuation at all sits near 0 dB.
+    The peak frequency is reported whatever the prominence, since a low value
+    is information about the stimulus rather than a reason to withhold the
+    measurement; read the two together.
+
+    Prominence was suggested by Kyurim Kang, who noted that the peak frequency
+    by itself cannot express how regular the modulation is.
+    """
     env = np.abs(sps.hilbert(y))
     # downsample envelope to ~200 Hz
     target_fs = 200
@@ -375,19 +443,45 @@ def modulation_peak_hz(y: np.ndarray, fs: int) -> Optional[float]:
         env = sps.resample_poly(env, target_fs, fs)
     else:
         target_fs = fs
-    env = env - np.mean(env)
+    empty = {"peak_hz": None, "prominence_db": None}
+    level = float(np.mean(env))
+    depth = float(np.std(env)) / level if level > 0 else 0.0
+    if depth < 1e-6:
+        # A constant envelope has no modulation rate. Silence and DC reach the
+        # spectrum as floating-point noise, whose argmax is an arbitrary bin
+        # and was being returned as though it were a measurement.
+        return empty
+    env = env - level
     n = len(env)
     if n < target_fs:
-        return None
+        return empty
     spec = np.abs(np.fft.rfft(env))
     freqs = np.fft.rfftfreq(n, 1.0 / target_fs)
     mask = (freqs >= 0.5) & (freqs <= 20.0)
     if not mask.any():
-        return None
+        return empty
     band = spec[mask]
     band_f = freqs[mask]
     idx = int(np.argmax(band))
-    return float(band_f[idx])
+    if not np.isfinite(band[idx]) or band[idx] <= 0:
+        # Silence and DC give an all-zero band, where argmax is the first bin.
+        # Returning its frequency would report a modulation rate for a signal
+        # that has no envelope fluctuation at all.
+        return empty
+    med = float(np.median(band))
+    prom = (float(20.0 * np.log10(band[idx] / med))
+            if med > 0 else None)
+    return {"peak_hz": float(band_f[idx]), "prominence_db": prom}
+
+
+def modulation_peak_hz(y: np.ndarray, fs: int) -> Optional[float]:
+    """Dominant amplitude-modulation rate (Hz) in the 0.5-20 Hz range.
+
+    Thin wrapper over :func:`modulation_peak`, kept because it is part of the
+    published API. New code should prefer ``modulation_peak``, which also
+    returns how well defined the peak is.
+    """
+    return modulation_peak(y, fs)["peak_hz"]
 
 
 # ---------- Spectral features ----------
@@ -554,6 +648,11 @@ class Result:
     # a withheld tempo carries the evidence for withholding it.
     beat_agreement: Optional[float] = None
     onset_flux: Optional[float] = None
+    modulation_peak_prominence_db: Optional[float] = None
+    # Timing regularity: whether recurring events are evenly spaced.
+    ioi_median_s: Optional[float] = None
+    ioi_cv: Optional[float] = None
+    npvi: Optional[float] = None
     # --- Temporal coverage (exploratory; additive — does NOT alter the 12
     # headline parameters or the validation benchmark). Each reports the
     # PROPORTION of the stimulus that sits beyond a Tier-1 reference value, so a
@@ -608,6 +707,7 @@ _NDIG = {
     "laeq_dbfs_a": 2, "dynamic_range_db": 2, "crest_factor_db": 2,
     "attack_mean_ms": 2, "attack_median_ms": 2, "attack_sd_ms": 2,
     "roughness_asper": 3, "tempo_bpm": 1, "modulation_peak_hz": 3,
+    "modulation_peak_prominence_db": 1, "ioi_median_s": 4, "ioi_cv": 3, "npvi": 1,
     "beat_agreement": 3, "onset_flux": 2,
     "spectral_centroid_hz": 1, "sharpness_acum": 3, "spectral_slope_beta": 3,
     "hnr_db": 2, "spectral_flatness": 4,
@@ -645,7 +745,8 @@ def _result_from_signal(y: np.ndarray, fs: int, file: str, duration_s: float,
     agree = beat_agreement(y, fs, librosa)
     oflux = onset_flux(y, fs, librosa)
     bpm = tempo_bpm(y, fs, librosa, agreement=agree, flux=oflux)
-    mod = modulation_peak_hz(y, fs)
+    mod = modulation_peak(y, fs)
+    timing = timing_regularity(y, fs, librosa)
     sc = spectral_centroid_hz(y, fs, librosa)
     sl = spectral_slope(y, fs)
     flat = spectral_flatness(y, librosa)
@@ -677,7 +778,14 @@ def _result_from_signal(y: np.ndarray, fs: int, file: str, duration_s: float,
         tempo_bpm=round(bpm, 1) if bpm is not None else None,
         beat_agreement=round(agree, 3) if agree is not None else None,
         onset_flux=round(oflux, 2) if oflux is not None else None,
-        modulation_peak_hz=round(mod, 3) if mod is not None else None,
+        modulation_peak_prominence_db=(round(mod['prominence_db'], 1)
+                                       if mod['prominence_db'] is not None else None),
+        ioi_median_s=(round(timing['ioi_median_s'], 4)
+                      if timing['ioi_median_s'] is not None else None),
+        ioi_cv=round(timing['ioi_cv'], 3) if timing['ioi_cv'] is not None else None,
+        npvi=round(timing['npvi'], 1) if timing['npvi'] is not None else None,
+        modulation_peak_hz=(round(mod['peak_hz'], 3)
+                            if mod['peak_hz'] is not None else None),
         spectral_centroid_hz=round(sc, 1),
         sharpness_acum=round(psy["sharpness_acum"], 3) if psy["sharpness_acum"] is not None else None,
         spectral_slope_beta=round(sl["beta"], 3) if sl["beta"] is not None else None,
@@ -783,6 +891,10 @@ def _aggregate_probes(results: list, file: str, duration_s: float, fs: int,
         tempo_bpm=med("tempo_bpm"),
         beat_agreement=med("beat_agreement"),
         onset_flux=med("onset_flux"),
+        modulation_peak_prominence_db=med("modulation_peak_prominence_db"),
+        ioi_median_s=med("ioi_median_s"),
+        ioi_cv=med("ioi_cv"),
+        npvi=med("npvi"),
         modulation_peak_hz=med("modulation_peak_hz"),
         spectral_centroid_hz=med("spectral_centroid_hz") or 0.0,
         sharpness_acum=med("sharpness_acum"),
@@ -885,6 +997,10 @@ def print_report(r: Result) -> None:
         ("4. Tempo (BPM)",                  r.tempo_bpm),
         ("   Beat agreement",               r.beat_agreement),
         ("   Onset flux",                   r.onset_flux),
+        ("   Modulation peak prominence dB", r.modulation_peak_prominence_db),
+        ("   IOI median (s)",               r.ioi_median_s),
+        ("   IOI CV",                       r.ioi_cv),
+        ("   nPVI",                         r.npvi),
         ("   Modulation peak (Hz)",         r.modulation_peak_hz),
         ("5. Spectral centroid (Hz)",       r.spectral_centroid_hz),
         ("6. Sharpness (acum)",             r.sharpness_acum),

@@ -60,6 +60,13 @@ the caller, since no analyser can determine them.
 | 10 | Delivery method | categorical | `delivery` *(caller-supplied)* |
 | 11 | Spectral flatness | [0, 1] | `spectral_flatness` (unweighted; see note) |
 
+Beyond the eleven reporting items, `Result` also carries descriptors that
+qualify them: `beat_agreement` and `onset_flux` say whether the tempo estimate
+applies at all, `modulation_peak_prominence_db` says how well defined the
+modulation rate is, and `ioi_cv` with `npvi` describe how evenly the events are
+spaced. Tempo and modulation rate answer how fast; these answer how evenly, and
+two stimuli matched for mean tempo can differ only in the latter.
+
 Item 11 is reported as the unweighted geometric-to-arithmetic mean ratio, a
 measure of tonality. The reporting set recommends the perceptual variant, in
 which the energy at each frequency is weighted by the masking energy there

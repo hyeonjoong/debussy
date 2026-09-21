@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `timing_regularity()`, reporting `ioi_median_s`, `ioi_cv` and `npvi`, and
+  `modulation_peak()`, which returns the modulation rate together with
+  `prominence_db`, the peak height over the median of the analysis band. All
+  four appear in `Result`. Reported by Kyurim Kang, who crossed three timbres
+  with periodic and aperiodic timing at a fixed mean tempo and found that
+  nothing then reported distinguished the two: tempo and modulation rate both
+  describe how fast events recur, neither describes how evenly. On those
+  stimuli the coefficient of variation separates the conditions completely and
+  recovers the constructed jitter to within 0.04.
+- `tests/test_timing_regularity.py`: the same construction, so the measured
+  variability is checked against the built-in value rather than assumed, plus
+  the measurement floor, sparse input and degenerate input.
+
 - `beat_agreement()` and `onset_flux()`, with reference constants
   `BEAT_AGREEMENT_REFERENCE`, `ONSET_FLUX_REFERENCE` and
   `TEMPO_TEST_MIN_DURATION_S`, deciding whether a tempo estimate applies to a
@@ -45,6 +58,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   estimator was right on only 62 per cent of the withheld classical tracks
   against 96 per cent of those kept. Both statistics are reported in `Result`
   and the check is opt-out, so nothing is lost that a caller wants to keep.
+- `modulation_peak_hz()` no longer reports a rate for silence. An all-zero
+  envelope spectrum has an argmax like any other, and its frequency was being
+  returned as though it were a measurement. A constant signal still returns a
+  rate, because the analytic envelope of a constant has edge artefacts, but it
+  comes with a prominence near 0 dB, which is what that number is for: across
+  the 60-track corpus the lowest prominence is about 15 dB.
+- Mean and median attack time can differ substantially on material whose
+  onsets are not uniform, and the median is the more stable summary. Both were
+  already reported; the documentation now says which to prefer and why.
+
 
 ### Notes
 
