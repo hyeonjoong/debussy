@@ -365,6 +365,64 @@ def tempo_bpm(y: np.ndarray, fs: int, librosa,
         return None
 
 
+#: Level, relative to the file peak, above which a step straight to digital
+#: silence is treated as an edit artefact rather than a natural ending. A cut
+#: at -60 dB is inaudible; one at -20 dB is a click.
+TRUNCATION_FLOOR_DB = -45.0
+
+#: Amplitude at or below which a sample counts as digital silence.
+_DIGITAL_SILENCE = 1e-5
+
+#: How long the silence has to last for the step to count as a truncation
+#: rather than a momentary zero crossing of a loud waveform.
+_TRUNCATION_GAP_MS = 5.0
+
+
+def truncation_clicks(y: np.ndarray, fs: int) -> dict:
+    """Count points where audible signal steps straight to digital silence.
+
+    A sound that is cut off rather than faded leaves a step discontinuity, and
+    a step is broadband: it is audible as a click and it is detected as an
+    onset, because acoustically it is one. In stimulus sets assembled by
+    concatenating rendered events this is a common and easily missed defect,
+    and it matters twice over. It adds a sharp transient at a fixed lag after
+    every event, which is itself an arousal-relevant feature, and it doubles
+    the apparent event count, which corrupts every statistic derived from
+    onsets, :func:`timing_regularity` included.
+
+    Found in stimuli sent by Kyurim Kang, where each rendered drum and piano
+    event ended in a step of -32 and -20 dB relative to peak. The metronome
+    events in the same set were cut too, but had already decayed to -62 dB, so
+    no click resulted and no spurious onset was detected. That contrast is the
+    whole of the phenomenon: what matters is the level at the cut, not that a
+    cut happened.
+
+    Returns the count and the largest step, in dB relative to the file peak.
+    A fade of a few milliseconds at the end of each event removes both.
+    """
+    y = np.asarray(y, dtype=float)
+    empty = {"n": 0, "max_step_db": None}
+    peak = float(np.abs(y).max()) if y.size else 0.0
+    if peak <= 0:
+        return empty
+    gap = max(int(_TRUNCATION_GAP_MS / 1000.0 * fs), 1)
+    if y.size < gap + 2:
+        return empty
+
+    quiet = (np.abs(y) <= _DIGITAL_SILENCE).astype(np.int64)
+    # A run of `gap` silent samples starting at i+1.
+    csum = np.concatenate(([0], np.cumsum(quiet)))
+    starts = np.arange(1, y.size - gap + 1)
+    silent_after = (csum[starts + gap] - csum[starts]) == gap
+
+    loud = np.abs(y[:y.size - gap]) > peak * 10.0 ** (TRUNCATION_FLOOR_DB / 20.0)
+    hit = np.nonzero(loud[: len(silent_after)] & silent_after)[0]
+    if hit.size == 0:
+        return empty
+    step = float(np.abs(y[hit]).max() / peak)
+    return {"n": int(hit.size), "max_step_db": float(20.0 * np.log10(step))}
+
+
 def timing_regularity(y: np.ndarray, fs: int, librosa) -> dict:
     """Inter-onset interval statistics: how evenly spaced the events are.
 
@@ -389,6 +447,15 @@ def timing_regularity(y: np.ndarray, fs: int, librosa) -> dict:
     exactly zero: about 0.01 for the coefficient of variation and 2 for nPVI
     at the default settings. Read those as the floor of the measurement, not
     as detected irregularity.
+
+    These statistics are only as good as the onsets they are built from. A
+    spurious onset between two real ones splits one interval into two unequal
+    parts and inflates both figures sharply: on a stimulus set whose events
+    were each cut off rather than faded, the resulting click was detected as a
+    second onset per event and an isochronous sequence returned a coefficient
+    of variation of 0.52 instead of about 0.01. Check
+    :func:`truncation_clicks` before reading these numbers; when it reports a
+    non-zero count, fix the stimulus rather than the statistic.
 
     Suggested by Kyurim Kang, who found that periodic and aperiodic stimuli
     matched for mean tempo were not separable by any descriptor then reported.
@@ -650,6 +717,8 @@ class Result:
     onset_flux: Optional[float] = None
     modulation_peak_prominence_db: Optional[float] = None
     # Timing regularity: whether recurring events are evenly spaced.
+    truncation_clicks: Optional[int] = None
+    truncation_max_step_db: Optional[float] = None
     ioi_median_s: Optional[float] = None
     ioi_cv: Optional[float] = None
     npvi: Optional[float] = None
@@ -707,7 +776,7 @@ _NDIG = {
     "laeq_dbfs_a": 2, "dynamic_range_db": 2, "crest_factor_db": 2,
     "attack_mean_ms": 2, "attack_median_ms": 2, "attack_sd_ms": 2,
     "roughness_asper": 3, "tempo_bpm": 1, "modulation_peak_hz": 3,
-    "modulation_peak_prominence_db": 1, "ioi_median_s": 4, "ioi_cv": 3, "npvi": 1,
+    "modulation_peak_prominence_db": 1, "truncation_max_step_db": 1, "ioi_median_s": 4, "ioi_cv": 3, "npvi": 1,
     "beat_agreement": 3, "onset_flux": 2,
     "spectral_centroid_hz": 1, "sharpness_acum": 3, "spectral_slope_beta": 3,
     "hnr_db": 2, "spectral_flatness": 4,
@@ -747,6 +816,7 @@ def _result_from_signal(y: np.ndarray, fs: int, file: str, duration_s: float,
     bpm = tempo_bpm(y, fs, librosa, agreement=agree, flux=oflux)
     mod = modulation_peak(y, fs)
     timing = timing_regularity(y, fs, librosa)
+    trunc = truncation_clicks(y, fs)
     sc = spectral_centroid_hz(y, fs, librosa)
     sl = spectral_slope(y, fs)
     flat = spectral_flatness(y, librosa)
@@ -758,6 +828,12 @@ def _result_from_signal(y: np.ndarray, fs: int, file: str, duration_s: float,
         notes.append("LAeq in dBFS-A (uncalibrated)")
     if clipped:
         notes.append(f"clipping: {n_clip} full-scale sample(s)")
+    if trunc["n"]:
+        notes.append(
+            f"{trunc['n']} truncation click(s), largest step "
+            f"{trunc['max_step_db']:.0f} dB below peak: events cut rather than "
+            f"faded. Each is detected as an onset, so onset count and "
+            f"IOI statistics are inflated")
     for k in ("_roughness_err", "_sharpness_err"):
         if psy.get(k):
             notes.append(f"{k.strip('_')}: {psy[k]}")
@@ -780,6 +856,9 @@ def _result_from_signal(y: np.ndarray, fs: int, file: str, duration_s: float,
         onset_flux=round(oflux, 2) if oflux is not None else None,
         modulation_peak_prominence_db=(round(mod['prominence_db'], 1)
                                        if mod['prominence_db'] is not None else None),
+        truncation_clicks=trunc['n'],
+        truncation_max_step_db=(round(trunc['max_step_db'], 1)
+                                if trunc['max_step_db'] is not None else None),
         ioi_median_s=(round(timing['ioi_median_s'], 4)
                       if timing['ioi_median_s'] is not None else None),
         ioi_cv=round(timing['ioi_cv'], 3) if timing['ioi_cv'] is not None else None,
@@ -892,6 +971,8 @@ def _aggregate_probes(results: list, file: str, duration_s: float, fs: int,
         beat_agreement=med("beat_agreement"),
         onset_flux=med("onset_flux"),
         modulation_peak_prominence_db=med("modulation_peak_prominence_db"),
+        truncation_clicks=med("truncation_clicks"),
+        truncation_max_step_db=med("truncation_max_step_db"),
         ioi_median_s=med("ioi_median_s"),
         ioi_cv=med("ioi_cv"),
         npvi=med("npvi"),
@@ -998,6 +1079,7 @@ def print_report(r: Result) -> None:
         ("   Beat agreement",               r.beat_agreement),
         ("   Onset flux",                   r.onset_flux),
         ("   Modulation peak prominence dB", r.modulation_peak_prominence_db),
+        ("   Truncation clicks",            r.truncation_clicks),
         ("   IOI median (s)",               r.ioi_median_s),
         ("   IOI CV",                       r.ioi_cv),
         ("   nPVI",                         r.npvi),

@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `truncation_clicks()`, counting points where audible signal steps straight
+  to digital silence, with `TRUNCATION_FLOOR_DB`. `Result` gains
+  `truncation_clicks` and `truncation_max_step_db`, and a non-zero count is
+  stated in the analysis notes. Found in stimuli sent by Kyurim Kang: each
+  rendered drum and piano event ended in a step of -32 and -20 dB relative to
+  peak, which is broadband and therefore detected as an onset, so an
+  isochronous sequence returned twice the true event count and a coefficient
+  of variation of 0.52 where the constructed value was zero. Metronome events
+  in the same set were cut identically but had decayed to -62 dB first, so no
+  click resulted. The level at the cut is what decides it, not the cut. Zero
+  false positives across the 60-track validation corpus.
+
 - `timing_regularity()`, reporting `ioi_median_s`, `ioi_cv` and `npvi`, and
   `modulation_peak()`, which returns the modulation rate together with
   `prominence_db`, the peak height over the median of the analysis band. All
