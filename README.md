@@ -86,8 +86,14 @@ subdivision. Their ratio is the reading, not either alone.
 Item 11 is reported as the unweighted geometric-to-arithmetic mean ratio, a
 measure of tonality. The reporting set recommends the perceptual variant, in
 which the energy at each frequency is weighted by the masking energy there
-(Bosi & Goldberg, 2003, p. 218). That variant requires a masking model and is
-not implemented here; the value returned should not be read as perceptual.
+(Bosi & Goldberg, 2003, p. 218). The masking model it needs is implemented in
+`debussy.masking`, as MPEG-1 Psychoacoustic Model 1 (ISO/IEC 11172-3 Annex
+D.1), checked against the published absolute threshold, Zwicker's critical
+bands and the spreading function's documented asymmetry. The weighted
+flatness itself is not settled and is not reported: the masked threshold is
+derived from the signal, so dividing by it flattens a pure tone more than it
+flattens noise, which inverts the ordering. The unweighted value is what the
+tool returns and should not be read as perceptual.
 
 `Result` additionally carries crest factor and temporal-coverage descriptors as
 diagnostics beyond the guideline.

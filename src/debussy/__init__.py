@@ -13,7 +13,8 @@ metadata, and additive temporal-coverage descriptors
 the stimulus that crosses each Tier-1 reference value — so a long clip that is
 calm on average no longer hides brief harsh passages.
 See the :mod:`debussy.level`, :mod:`debussy.envelope`, :mod:`debussy.spectral`,
-:mod:`debussy.tonal`, and :mod:`debussy.psychoacoustic` submodules for the
+:mod:`debussy.tonal`, :mod:`debussy.psychoacoustic`, and
+:mod:`debussy.masking` submodules for the
 parameter-family groupings.
 """
 from ._core import (

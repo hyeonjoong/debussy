@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `debussy.masking`, an implementation of MPEG-1 Psychoacoustic Model 1
+  (ISO/IEC 11172-3 Annex D.1): threshold in quiet, Bark scale, tonal and
+  noise masker identification and decimation, the level-dependent spreading
+  function, and the global masked threshold. Marina Bosi named this model as
+  the reference to follow when we asked which one to take for item 11 of the
+  reporting set.
+
+  The standard's conformance vectors are not public, so this is not certified
+  bit-exact and does not claim to be. It is checked against every published
+  quantity it is built from and every property it must have: the absolute
+  threshold against the Terhardt formula and at its minimum, the Bark scale
+  against Zwicker's tabulated band edges to within a fifth of a Bark, the
+  spreading function's continuity at all three breakpoints together with its
+  upward asymmetry and level dependence, tonal-versus-noise classification by
+  power share rather than masker count, reduction to the threshold in quiet
+  on silence, monotonicity in masker level at roughly a decibel per decibel,
+  and locality. One of those checks caught a 3 dB error in the level
+  normalisation during development, which would have biased every threshold
+  because the spreading function is level-dependent.
+
+  The perceptually weighted flatness this enables is deliberately not
+  included. The masked threshold is derived from the signal, so dividing the
+  signal by it flattens whatever is measured and a pure tone comes out
+  flatter than noise, inverting the ordering a tonality measure has to
+  produce. Which normalisation the source intends is a question for the
+  author rather than for guesswork, and it is outstanding.
+
+### Added
+
 - CI runs the test matrix on Python 3.13 and 3.14, and the matching
   classifiers are declared (#20). `requires-python` has always been `>=3.10`
   with no upper bound, so pip installed on both and nothing verified that
