@@ -54,7 +54,7 @@ import os
 import sys
 import warnings
 from dataclasses import dataclass, asdict, field
-from typing import Optional
+from typing import Optional, Tuple
 
 import numpy as np
 import soundfile as sf
@@ -174,7 +174,190 @@ def attack_times_ms(y: np.ndarray, fs: int, librosa) -> dict:
 
 # ---------- Tempo / modulation rate ----------
 
-def tempo_bpm(y: np.ndarray, fs: int, librosa) -> Optional[float]:
+#: Minimum mean mutual agreement for a tempo to be reported.
+#:
+#: Set by the beatless class rather than tuned for coverage: it is the lowest
+#: value that rejects every aperiodic signal in
+#: ``tests/test_tempo_applicability.py`` (highest such signal 0.690) and every
+#: track in the beatless half of the validation corpus (highest 0.686).
+#:
+#: Against the 998 GTZAN tracks carrying human tempo annotations (Marchand &
+#: Peeters), the rule withholds tempo from 15.2 per cent of them and raises the
+#: accuracy of the tempi still reported, measured against those annotations
+#: with octave and 3:2 relations allowed, from 92.1 to 97.4 per cent.
+#:
+#: That trade is worth stating rather than only the headline. Withholding
+#: removes 95 tempi that did match the annotation along with 57 that did not,
+#: so it costs about 1.7 correct values for each incorrect one it suppresses.
+#: It is the right default for a reporting tool, where an unmarked wrong value
+#: propagates and a missing one does not, but it is a default: pass both
+#: statistics as ``None`` to :func:`tempo_bpm` for the unchecked estimate, and
+#: both are reported in :class:`Result` so a different threshold can be
+#: applied downstream.
+#:
+#: Withholding is not evenly spread across material, and the pattern follows
+#: difficulty rather than genre as such. Classical loses 48 per cent of tracks
+#: and jazz 29, against 4 to 14 for the remaining eight genres; but on the
+#: withheld classical tracks the unchecked estimator was right only 62 per
+#: cent of the time, against 96 on the ones kept, and classical has the lowest
+#: unchecked accuracy of any genre at 80 per cent. Slow, rubato and
+#: non-percussive material is where tempo estimation actually fails, and it is
+#: also common in relaxation and sleep audio, so users working with that
+#: repertoire should expect a high proportion of absent tempi. No lower
+#: threshold avoids this: at 0.65 classical still loses 42 per cent while a
+#: quarter of the beatless corpus starts passing.
+BEAT_AGREEMENT_REFERENCE = 0.69
+
+#: Minimum onset flux for a tempo to be reported: the mean of the
+#: onset-strength envelope. The envelope is a difference of log-magnitude mel
+#: spectra, so this is invariant to playback level; it is computed after
+#: resampling to :data:`_TEMPO_TEST_SR`, which makes it invariant to input
+#: sample rate as well.
+#:
+#: Agreement alone is not enough. A tone under very slow amplitude modulation
+#: has almost no onsets, but every committee member locks onto the same swell,
+#: so they agree with each other while agreeing about nothing in the signal,
+#: and it crosses the agreement reference at some excerpt lengths and not
+#: others. Flux separates that case with a wide margin and at no cost:
+#: sustained tones, chords and slow swells reach 0.086 at most, while the
+#: lowest of the 998 annotated GTZAN tracks is 0.609, and the condition
+#: withholds none of them.
+ONSET_FLUX_REFERENCE = 0.15
+
+#: Internal sample rate for the tempo applicability statistics. Both are
+#: computed on audio resampled to this rate so that the same signal gives the
+#: same answer whatever rate it arrives at: librosa's onset envelope uses a
+#: hop length fixed in samples, so at native rates the envelope means of one
+#: click train span 0.165 to 0.665 across 16-48 kHz, against 0.439 to 0.442
+#: once resampled.
+_TEMPO_TEST_SR = 22050
+
+#: Shortest excerpt for which the applicability test was validated. Below this
+#: the committee has too few beats to agree or disagree about; the test is
+#: still applied, since reporting an unchecked tempo is the worse failure, but
+#: results on shorter excerpts are outside what has been verified.
+TEMPO_TEST_MIN_DURATION_S = 15.0
+
+
+def _beat_f_measure(ref: np.ndarray, est: np.ndarray, tol: float = 0.07) -> float:
+    """Beat-tracking F-measure between two beat sequences, 70 ms tolerance."""
+    if len(ref) == 0 or len(est) == 0:
+        return 0.0
+    used = np.zeros(len(est), dtype=bool)
+    tp = 0
+    for r in ref:
+        d = np.abs(est - r)
+        d[used] = np.inf
+        j = int(np.argmin(d))
+        if d[j] <= tol:
+            tp += 1
+            used[j] = True
+    prec, rec = tp / len(est), tp / len(ref)
+    return 0.0 if prec + rec == 0 else 2 * prec * rec / (prec + rec)
+
+
+def _to_test_rate(y: np.ndarray, fs: int, librosa):
+    """Resample to the fixed internal rate used by both applicability statistics."""
+    if fs == _TEMPO_TEST_SR:
+        return y, fs
+    return librosa.resample(np.asarray(y, dtype=np.float32), orig_sr=fs,
+                            target_sr=_TEMPO_TEST_SR), _TEMPO_TEST_SR
+
+
+def onset_flux(y: np.ndarray, fs: int, librosa) -> Optional[float]:
+    """Mean of the onset-strength envelope: how much spectral change is present.
+
+    The envelope is a difference of log-magnitude mel spectra, so the value
+    does not move with playback level. Dividing it by signal RMS, which looks
+    like the natural normalisation, would reintroduce exactly the level
+    dependence it already lacks.
+    """
+    try:
+        y, fs = _to_test_rate(y, fs, librosa)
+        env = librosa.onset.onset_strength(y=y, sr=fs)
+        return float(env.mean()) if np.any(env) else 0.0
+    except Exception:
+        return None
+
+
+def beat_agreement(y: np.ndarray, fs: int, librosa) -> Optional[float]:
+    """Mean pairwise agreement between beat sequences from several trackers.
+
+    A beat tracker returns a number for any input. Given material with no
+    recurring onsets it returns the mode of its own tempo prior, which reads as
+    a confident estimate and is an artefact of the peak-picker rather than a
+    property of the signal. Committee agreement is the established way to
+    detect that without ground truth: where a beat grid exists, trackers
+    starting from different features recover the same one; where none exists,
+    each follows its own artefact and they disagree.
+
+    Members differ in onset feature (default spectral flux, a 32-band mel
+    variant, a lagged variant) and in tracker (dynamic-programming beat
+    tracking for the first three, peak-picking on the predominant-local-pulse
+    curve for the fourth). Agreement is the mean pairwise beat F-measure at the
+    conventional 70 ms tolerance, so the value is bounded in [0, 1].
+
+    After Holzapfel, Davies, Zapata, Oliveira & Gouyon (2012), "Selective
+    sampling for beat tracking evaluation", IEEE TASLP 20(9), 2539-2548, who
+    use mutual agreement between independent trackers to identify pieces on
+    which beat tracking fails.
+
+    Single statistics computed from one onset envelope were tried first and do
+    not work. Onset density is actively misleading, scoring broadband noise
+    above music. Autocorrelation peak prominence, tempogram contrast and
+    window-to-window tempo agreement each separate the synthetic controls but
+    reject 87 per cent or more of annotated music at any threshold that also
+    rejects the controls. The pulse-clarity model of Lartillot, Eerola,
+    Toiviainen & Fornari (2008) grades how clear an existing pulse is and is
+    not an applicability test: a sustained tone has a near-constant onset
+    envelope whose autocorrelation stays high at every lag.
+    """
+    try:
+        y, fs = _to_test_rate(y, fs, librosa)
+        envs = [
+            librosa.onset.onset_strength(y=y, sr=fs),
+            librosa.onset.onset_strength(y=y, sr=fs, n_mels=32),
+            librosa.onset.onset_strength(y=y, sr=fs, lag=2),
+        ]
+        seqs = []
+        for env in envs:
+            if not np.any(env):
+                continue
+            _, beats = librosa.beat.beat_track(onset_envelope=env, sr=fs,
+                                               units="time")
+            if len(beats) > 2:
+                seqs.append(np.asarray(beats, dtype=float))
+        if np.any(envs[0]):
+            pulse = librosa.beat.plp(onset_envelope=envs[0], sr=fs)
+            idx = librosa.util.peak_pick(pulse, pre_max=5, post_max=5,
+                                         pre_avg=5, post_avg=5, delta=0.05,
+                                         wait=5)
+            beats = librosa.frames_to_time(idx, sr=fs)
+            if len(beats) > 2:
+                seqs.append(np.asarray(beats, dtype=float))
+        if len(seqs) < 2:
+            return 0.0
+        vals = [_beat_f_measure(seqs[i], seqs[j])
+                for i in range(len(seqs)) for j in range(i + 1, len(seqs))]
+        return float(np.mean(vals)) if vals else 0.0
+    except Exception:
+        return None
+
+
+def tempo_bpm(y: np.ndarray, fs: int, librosa,
+              agreement: Optional[float] = None,
+              flux: Optional[float] = None) -> Optional[float]:
+    """Dominant tempo in BPM, or ``None`` when no stable pulse is present.
+
+    Withheld when either supplied statistic falls below its reference value.
+    An absent tempo states "no stable pulse" honestly, where a number would
+    assert a periodicity the signal does not have. Pass both as ``None`` for
+    the raw estimate with no applicability test.
+    """
+    if agreement is not None and agreement < BEAT_AGREEMENT_REFERENCE:
+        return None
+    if flux is not None and flux < ONSET_FLUX_REFERENCE:
+        return None
     try:
         t = librosa.feature.tempo(y=y, sr=fs)
         return float(np.atleast_1d(t)[0])
@@ -182,9 +365,271 @@ def tempo_bpm(y: np.ndarray, fs: int, librosa) -> Optional[float]:
         return None
 
 
-def modulation_peak_hz(y: np.ndarray, fs: int) -> Optional[float]:
-    """Dominant amplitude-modulation rate (Hz) in 0.5–20 Hz range,
-    derived from the envelope spectrum."""
+#: Level, relative to the file peak, above which a step straight to digital
+#: silence is treated as an edit artefact rather than a natural ending. A cut
+#: at -60 dB is inaudible; one at -20 dB is a click.
+TRUNCATION_FLOOR_DB = -45.0
+
+#: Amplitude at or below which a sample counts as digital silence.
+_DIGITAL_SILENCE = 1e-5
+
+#: How long the silence has to last for the step to count as a truncation
+#: rather than a momentary zero crossing of a loud waveform.
+_TRUNCATION_GAP_MS = 5.0
+
+
+def truncation_clicks(y: np.ndarray, fs: int) -> dict:
+    """Count points where audible signal steps straight to digital silence.
+
+    A sound that is cut off rather than faded leaves a step discontinuity, and
+    a step is broadband: it is audible as a click and it is detected as an
+    onset, because acoustically it is one. In stimulus sets assembled by
+    concatenating rendered events this is a common and easily missed defect,
+    and it matters twice over. It adds a sharp transient at a fixed lag after
+    every event, which is itself an arousal-relevant feature, and it doubles
+    the apparent event count, which corrupts every statistic derived from
+    onsets, :func:`timing_regularity` included.
+
+    Found in stimuli sent by Kyurim Kang, where each rendered drum and piano
+    event ended in a step of -32 and -20 dB relative to peak. The metronome
+    events in the same set were cut too, but had already decayed to -62 dB, so
+    no click resulted and no spurious onset was detected. That contrast is the
+    whole of the phenomenon: what matters is the level at the cut, not that a
+    cut happened.
+
+    Returns the count and the largest step, in dB relative to the file peak.
+    A short fade at the end of each event removes the step, but how short is
+    short enough depends on the level at the cut: in the set described above a
+    5 ms fade was sufficient for the drum events, cut at -32 dB, while the
+    piano events, cut at -20 dB, still produced one spurious onset each until
+    the fade reached about 20 ms.
+
+    A zero count does not by itself certify the endings, because this
+    function measures the waveform rather than the consequence: a 5 ms fade
+    drops the last audible sample below the floor while the transition can
+    still be fast enough to be detected as an onset. :func:`abrupt_endings`
+    covers that case, and a clean bill needs both to be zero.
+    """
+    y = np.asarray(y, dtype=float)
+    empty = {"n": 0, "max_step_db": None}
+    peak = float(np.abs(y).max()) if y.size else 0.0
+    if peak <= 0:
+        return empty
+    gap = max(int(_TRUNCATION_GAP_MS / 1000.0 * fs), 1)
+    if y.size < gap + 2:
+        return empty
+
+    quiet = (np.abs(y) <= _DIGITAL_SILENCE).astype(np.int64)
+    # A run of `gap` silent samples starting at i+1.
+    csum = np.concatenate(([0], np.cumsum(quiet)))
+    starts = np.arange(1, y.size - gap + 1)
+    silent_after = (csum[starts + gap] - csum[starts]) == gap
+
+    loud = np.abs(y[:y.size - gap]) > peak * 10.0 ** (TRUNCATION_FLOOR_DB / 20.0)
+    hit = np.nonzero(loud[: len(silent_after)] & silent_after)[0]
+    if hit.size == 0:
+        return empty
+    step = float(np.abs(y[hit]).max() / peak)
+    return {"n": int(hit.size), "max_step_db": float(20.0 * np.log10(step))}
+
+
+
+#: Window, in milliseconds relative to the end of the audible signal, in which
+#: a detected onset is attributed to the ending rather than to whatever comes
+#: next.
+#:
+#: The window is asymmetric because the two cases sit on opposite sides. An
+#: ending that clicks is detected at the transition or, since onset detection
+#: backtracks to the preceding energy minimum, shortly before it. Audio
+#: resuming after a brief dropout is detected shortly after. Measured across
+#: 2,921 silence transitions drawn from constructed stimuli, real stimulus
+#: sets and the 60-track validation corpus, this window captures 97.5 per
+#: cent of the endings in files whose onset count is demonstrably corrupted
+#: and none of the transitions in files that are not. Widening the lower
+#: bound to -40 ms adds one percentage point of the former and the first of
+#: the latter, which is the wrong trade: telling someone their clean stimulus
+#: is broken costs more than missing one ending in a file already flagged by
+#: the others.
+ABRUPT_ENDING_WINDOW_MS = (-30.0, 2.5)
+
+
+def abrupt_endings(y: np.ndarray, fs: int, librosa,
+                   onsets_s: Optional[np.ndarray] = None) -> dict:
+    """Count endings that the onset detector fires on.
+
+    :func:`truncation_clicks` asks what the waveform does, and answers it by
+    the level at which the signal is cut. That is the right question for
+    whether a click is audible, and the wrong one for whether the onset
+    statistics can be trusted, because the two come apart. Fading an event
+    over 5 ms drops the last audible sample far below the truncation floor,
+    so no click is reported, while the transition is still fast relative to
+    the analysis window and still produces an onset: in the stimuli that
+    prompted this, the piano files at a 5 ms fade reported zero truncation
+    clicks and still returned twice the true onset count.
+
+    So this asks the question that matters directly. It finds every point
+    where audible signal gives way to sustained digital silence, and counts
+    those coinciding with a detected onset. An ending that is detected as an
+    onset will inflate the event count and every interval statistic derived
+    from it, whatever the waveform looks like.
+
+    Reported alongside :func:`truncation_clicks`, not instead of it: the
+    truncation count and step size say what is wrong with the file and how
+    audible it is, this says whether it reaches the numbers. A clean bill
+    needs both to be zero.
+
+    Returns the count and the number of silence transitions examined. The
+    count is a conservative lower bound on how many endings are reaching the
+    statistics, for the reason given at :data:`ABRUPT_ENDING_WINDOW_MS`:
+    where backtracking carries the onset far enough back, the ending is
+    missed. Read it as evidence that the endings need fixing, not as an
+    inventory of which ones. Pass ``onsets_s`` to reuse onsets already
+    detected elsewhere.
+    """
+    y = np.asarray(y, dtype=float)
+    empty = {"n": 0, "n_transitions": 0}
+    gap = max(int(_TRUNCATION_GAP_MS / 1000.0 * fs), 1)
+    if y.size < gap + 2:
+        return empty
+
+    quiet = np.abs(y) <= _DIGITAL_SILENCE
+    csum = np.concatenate(([0], np.cumsum(quiet.astype(np.int64))))
+    starts = np.arange(1, y.size - gap + 1)
+    run = (csum[starts + gap] - csum[starts]) == gap
+    # The transition is the last audible sample, not any sample inside silence.
+    ends = np.nonzero((~quiet[: len(run)]) & run)[0]
+    if ends.size == 0:
+        return empty
+
+    if onsets_s is None:
+        try:
+            onsets_s = librosa.onset.onset_detect(y=y, sr=fs, units="time",
+                                                  backtrack=True)
+        except Exception:
+            return {"n": 0, "n_transitions": int(ends.size)}
+    onsets_s = np.asarray(onsets_s, dtype=float)
+    if onsets_s.size == 0:
+        return {"n": 0, "n_transitions": int(ends.size)}
+
+    lo, hi = (v / 1000.0 for v in ABRUPT_ENDING_WINDOW_MS)
+    t_end = ends / float(fs)
+    nearest = onsets_s[np.argmin(np.abs(onsets_s[None, :] - t_end[:, None]),
+                                 axis=1)]
+    offset = nearest - t_end
+    return {"n": int(np.count_nonzero((offset >= lo) & (offset <= hi))),
+            "n_transitions": int(ends.size)}
+
+
+def timing_regularity(y: np.ndarray, fs: int, librosa) -> dict:
+    """Inter-onset interval statistics: how evenly spaced the events are.
+
+    Tempo says how fast events recur and the modulation peak says at what rate
+    the envelope fluctuates. Neither says whether the recurrence is even, and
+    two stimuli built to the same mean tempo, one isochronous and one jittered,
+    can return the same value for both. These statistics separate them.
+
+    ``ioi_cv`` is the coefficient of variation of the intervals, the
+    conventional index of timing variability. ``npvi`` is the normalised
+    pairwise variability index, the mean absolute difference between
+    successive intervals as a percentage of their running mean; it responds to
+    local unevenness and, unlike the coefficient of variation, is largely
+    unaffected by a gradual change of tempo across the excerpt. Reporting both
+    distinguishes a piece that is locally even but speeds up from one that is
+    uneven throughout.
+
+    Onsets are detected with the same call used for the attack-time
+    distribution, so the two descriptions refer to the same events. Detection
+    is frame-based, so intervals are quantised to the analysis hop and a
+    perfectly isochronous sequence returns a small non-zero value rather than
+    exactly zero: about 0.01 for the coefficient of variation and 2 for nPVI
+    at the default settings. Read those as the floor of the measurement, not
+    as detected irregularity.
+
+    These statistics are only as good as the onsets they are built from. A
+    spurious onset between two real ones splits one interval into two unequal
+    parts and inflates both figures sharply: on a stimulus set whose events
+    were each cut off rather than faded, the resulting click was detected as a
+    second onset per event and an isochronous sequence returned a coefficient
+    of variation of 0.52 instead of about 0.01. Check
+    :func:`truncation_clicks` and :func:`abrupt_endings` before reading these
+    numbers; when either reports a non-zero count, fix the stimulus rather
+    than the statistic.
+
+    Suggested by Kyurim Kang, who found that periodic and aperiodic stimuli
+    matched for mean tempo were not separable by any descriptor then reported.
+    """
+    empty = {"ioi_median_s": None, "ioi_cv": None, "npvi": None, "onsets_s": None}
+    try:
+        onsets = librosa.onset.onset_detect(y=y, sr=fs, units="time",
+                                            backtrack=True)
+    except Exception:
+        return empty
+    d = np.diff(np.asarray(onsets, dtype=float))
+    d = d[d > 0]
+    if len(d) < 3:
+        return dict(empty, onsets_s=np.asarray(onsets, dtype=float))
+    mean = float(d.mean())
+    if mean <= 0:
+        return empty
+    pairs = np.abs(d[:-1] - d[1:]) / ((d[:-1] + d[1:]) / 2.0)
+    return {
+        "ioi_median_s": float(np.median(d)),
+        "ioi_cv": float(d.std(ddof=1) / mean),
+        "npvi": float(100.0 * pairs.mean()),
+        "onsets_s": np.asarray(onsets, dtype=float),
+    }
+
+
+
+def event_rate_per_min(ioi_median_s: Optional[float]) -> Optional[float]:
+    """Events per minute, from the median inter-onset interval.
+
+    Reported beside :data:`Result.tempo_bpm`, which estimates periodicity from
+    the onset envelope, because the two answer different questions and come
+    apart exactly where it matters. On material with one event per beat they
+    agree. On jittered sequences the envelope estimate degrades badly while
+    the interval median does not: across the aperiodic stimuli that prompted
+    this, built with an inter-onset coefficient of variation near 0.12, the
+    envelope estimate missed the constructed tempo by a median of 12.3 BPM and
+    was withheld altogether for two of nine files, while the interval median
+    recovered it to within 0.8 BPM for all nine.
+
+    The converse holds on music, which is why this does not replace
+    ``tempo_bpm``. Where a beat carries several events the interval median
+    tracks the subdivision, not the beat: across the validation corpus this
+    figure runs a median of 2.3 times the envelope tempo. Their ratio is
+    therefore the useful reading. Near one, the events are the beat. Well
+    above one, either the material subdivides or the onsets include something
+    that is not an event, which is worth checking against
+    :func:`abrupt_endings` before interpreting either number.
+    """
+    if not ioi_median_s or ioi_median_s <= 0:
+        return None
+    return 60.0 / float(ioi_median_s)
+
+
+def modulation_peak(y: np.ndarray, fs: int) -> dict:
+    """Dominant amplitude-modulation rate and how well defined that peak is.
+
+    The rate alone does not say whether there is a peak worth reporting. A
+    jittered stimulus spreads its envelope energy across neighbouring rates, so
+    the argmax can land on a harmonic or on noise while still being returned as
+    a single confident number. ``prominence_db`` is the peak height over the
+    median of the analysis band, in decibels: near 0 dB when the envelope
+    spectrum is flat, and tens of decibels when one rate dominates. The ratio
+    itself spans several orders of magnitude between a metronome and a
+    jittered sequence, which is why it is reported logarithmically.
+
+    For scale: across the 60-track validation corpus the lowest prominence is
+    about 15 dB, jittered click sequences built to a fixed mean tempo reach 10
+    to 23 dB, and a signal with no envelope fluctuation at all sits near 0 dB.
+    The peak frequency is reported whatever the prominence, since a low value
+    is information about the stimulus rather than a reason to withhold the
+    measurement; read the two together.
+
+    Prominence was suggested by Kyurim Kang, who noted that the peak frequency
+    by itself cannot express how regular the modulation is.
+    """
     env = np.abs(sps.hilbert(y))
     # downsample envelope to ~200 Hz
     target_fs = 200
@@ -192,19 +637,45 @@ def modulation_peak_hz(y: np.ndarray, fs: int) -> Optional[float]:
         env = sps.resample_poly(env, target_fs, fs)
     else:
         target_fs = fs
-    env = env - np.mean(env)
+    empty = {"peak_hz": None, "prominence_db": None}
+    level = float(np.mean(env))
+    depth = float(np.std(env)) / level if level > 0 else 0.0
+    if depth < 1e-6:
+        # A constant envelope has no modulation rate. Silence and DC reach the
+        # spectrum as floating-point noise, whose argmax is an arbitrary bin
+        # and was being returned as though it were a measurement.
+        return empty
+    env = env - level
     n = len(env)
     if n < target_fs:
-        return None
+        return empty
     spec = np.abs(np.fft.rfft(env))
     freqs = np.fft.rfftfreq(n, 1.0 / target_fs)
     mask = (freqs >= 0.5) & (freqs <= 20.0)
     if not mask.any():
-        return None
+        return empty
     band = spec[mask]
     band_f = freqs[mask]
     idx = int(np.argmax(band))
-    return float(band_f[idx])
+    if not np.isfinite(band[idx]) or band[idx] <= 0:
+        # Silence and DC give an all-zero band, where argmax is the first bin.
+        # Returning its frequency would report a modulation rate for a signal
+        # that has no envelope fluctuation at all.
+        return empty
+    med = float(np.median(band))
+    prom = (float(20.0 * np.log10(band[idx] / med))
+            if med > 0 else None)
+    return {"peak_hz": float(band_f[idx]), "prominence_db": prom}
+
+
+def modulation_peak_hz(y: np.ndarray, fs: int) -> Optional[float]:
+    """Dominant amplitude-modulation rate (Hz) in the 0.5-20 Hz range.
+
+    Thin wrapper over :func:`modulation_peak`, kept because it is part of the
+    published API. New code should prefer ``modulation_peak``, which also
+    returns how well defined the peak is.
+    """
+    return modulation_peak(y, fs)["peak_hz"]
 
 
 # ---------- Spectral features ----------
@@ -367,6 +838,19 @@ class Result:
     delivery: str
     spectral_flatness: float
     crest_factor_db: Optional[float] = None
+    # Applicability of tempo_bpm, reported alongside it rather than hidden, so
+    # a withheld tempo carries the evidence for withholding it.
+    beat_agreement: Optional[float] = None
+    onset_flux: Optional[float] = None
+    modulation_peak_prominence_db: Optional[float] = None
+    # Timing regularity: whether recurring events are evenly spaced.
+    truncation_clicks: Optional[int] = None
+    abrupt_endings: Optional[int] = None
+    event_rate_per_min: Optional[float] = None
+    truncation_max_step_db: Optional[float] = None
+    ioi_median_s: Optional[float] = None
+    ioi_cv: Optional[float] = None
+    npvi: Optional[float] = None
     # --- Temporal coverage (exploratory; additive — does NOT alter the 12
     # headline parameters or the validation benchmark). Each reports the
     # PROPORTION of the stimulus that sits beyond a Tier-1 reference value, so a
@@ -421,6 +905,9 @@ _NDIG = {
     "laeq_dbfs_a": 2, "dynamic_range_db": 2, "crest_factor_db": 2,
     "attack_mean_ms": 2, "attack_median_ms": 2, "attack_sd_ms": 2,
     "roughness_asper": 3, "tempo_bpm": 1, "modulation_peak_hz": 3,
+    "modulation_peak_prominence_db": 1, "truncation_max_step_db": 1,
+    "event_rate_per_min": 1, "ioi_median_s": 4, "ioi_cv": 3, "npvi": 1,
+    "beat_agreement": 3, "onset_flux": 2,
     "spectral_centroid_hz": 1, "sharpness_acum": 3, "spectral_slope_beta": 3,
     "hnr_db": 2, "spectral_flatness": 4,
 }
@@ -454,8 +941,13 @@ def _result_from_signal(y: np.ndarray, fs: int, file: str, duration_s: float,
         )
 
     att = attack_times_ms(y, fs, librosa)
-    bpm = tempo_bpm(y, fs, librosa)
-    mod = modulation_peak_hz(y, fs)
+    agree = beat_agreement(y, fs, librosa)
+    oflux = onset_flux(y, fs, librosa)
+    bpm = tempo_bpm(y, fs, librosa, agreement=agree, flux=oflux)
+    mod = modulation_peak(y, fs)
+    timing = timing_regularity(y, fs, librosa)
+    trunc = truncation_clicks(y, fs)
+    abrupt = abrupt_endings(y, fs, librosa, onsets_s=timing.get('onsets_s'))
     sc = spectral_centroid_hz(y, fs, librosa)
     sl = spectral_slope(y, fs)
     flat = spectral_flatness(y, librosa)
@@ -467,6 +959,17 @@ def _result_from_signal(y: np.ndarray, fs: int, file: str, duration_s: float,
         notes.append("LAeq in dBFS-A (uncalibrated)")
     if clipped:
         notes.append(f"clipping: {n_clip} full-scale sample(s)")
+    if abrupt["n"] and not trunc["n"]:
+        notes.append(
+            f"{abrupt['n']} of {abrupt['n_transitions']} ending(s) detected as "
+            f"an onset: faded, but still fast enough to register, so onset "
+            f"count and IOI statistics are inflated")
+    if trunc["n"]:
+        notes.append(
+            f"{trunc['n']} truncation click(s), largest step "
+            f"{trunc['max_step_db']:.0f} dB below peak: events cut rather than "
+            f"faded. Each is detected as an onset, so onset count and "
+            f"IOI statistics are inflated")
     for k in ("_roughness_err", "_sharpness_err"):
         if psy.get(k):
             notes.append(f"{k.strip('_')}: {psy[k]}")
@@ -485,7 +988,23 @@ def _result_from_signal(y: np.ndarray, fs: int, file: str, duration_s: float,
         attack_sd_ms=round(att["sd_ms"], 2) if att["sd_ms"] is not None else None,
         roughness_asper=round(psy["roughness_asper"], 3) if psy["roughness_asper"] is not None else None,
         tempo_bpm=round(bpm, 1) if bpm is not None else None,
-        modulation_peak_hz=round(mod, 3) if mod is not None else None,
+        beat_agreement=round(agree, 3) if agree is not None else None,
+        onset_flux=round(oflux, 2) if oflux is not None else None,
+        modulation_peak_prominence_db=(round(mod['prominence_db'], 1)
+                                       if mod['prominence_db'] is not None else None),
+        truncation_clicks=trunc['n'],
+        abrupt_endings=abrupt['n'],
+        event_rate_per_min=(round(_er, 1)
+                            if (_er := event_rate_per_min(timing['ioi_median_s']))
+                            is not None else None),
+        truncation_max_step_db=(round(trunc['max_step_db'], 1)
+                                if trunc['max_step_db'] is not None else None),
+        ioi_median_s=(round(timing['ioi_median_s'], 4)
+                      if timing['ioi_median_s'] is not None else None),
+        ioi_cv=round(timing['ioi_cv'], 3) if timing['ioi_cv'] is not None else None,
+        npvi=round(timing['npvi'], 1) if timing['npvi'] is not None else None,
+        modulation_peak_hz=(round(mod['peak_hz'], 3)
+                            if mod['peak_hz'] is not None else None),
         spectral_centroid_hz=round(sc, 1),
         sharpness_acum=round(psy["sharpness_acum"], 3) if psy["sharpness_acum"] is not None else None,
         spectral_slope_beta=round(sl["beta"], 3) if sl["beta"] is not None else None,
@@ -589,6 +1108,16 @@ def _aggregate_probes(results: list, file: str, duration_s: float, fs: int,
         attack_sd_ms=med("attack_sd_ms"),
         roughness_asper=med("roughness_asper"),
         tempo_bpm=med("tempo_bpm"),
+        beat_agreement=med("beat_agreement"),
+        onset_flux=med("onset_flux"),
+        modulation_peak_prominence_db=med("modulation_peak_prominence_db"),
+        truncation_clicks=med("truncation_clicks"),
+        abrupt_endings=med("abrupt_endings"),
+        event_rate_per_min=med("event_rate_per_min"),
+        truncation_max_step_db=med("truncation_max_step_db"),
+        ioi_median_s=med("ioi_median_s"),
+        ioi_cv=med("ioi_cv"),
+        npvi=med("npvi"),
         modulation_peak_hz=med("modulation_peak_hz"),
         spectral_centroid_hz=med("spectral_centroid_hz") or 0.0,
         sharpness_acum=med("sharpness_acum"),
@@ -689,6 +1218,15 @@ def print_report(r: Result) -> None:
         ("   Onsets detected",              r.attack_n_onsets),
         ("3. Roughness (asper)",            r.roughness_asper),
         ("4. Tempo (BPM)",                  r.tempo_bpm),
+        ("   Beat agreement",               r.beat_agreement),
+        ("   Onset flux",                   r.onset_flux),
+        ("   Modulation peak prominence dB", r.modulation_peak_prominence_db),
+        ("   Truncation clicks",            r.truncation_clicks),
+        ("   Abrupt endings",               r.abrupt_endings),
+        ("   Event rate (per min)",         r.event_rate_per_min),
+        ("   IOI median (s)",               r.ioi_median_s),
+        ("   IOI CV",                       r.ioi_cv),
+        ("   nPVI",                         r.npvi),
         ("   Modulation peak (Hz)",         r.modulation_peak_hz),
         ("5. Spectral centroid (Hz)",       r.spectral_centroid_hz),
         ("6. Sharpness (acum)",             r.sharpness_acum),
@@ -1076,11 +1614,17 @@ def tier3_items(r: Result) -> list[dict]:
     else:
         interp = "Noise-like"
     items.append({
-        "parameter": "Spectral flatness",
+        "parameter": "Spectral flatness (unweighted)",
         "value": _fmt(v, n=4),
         "unit": "",
         "interpretation": interp,
-        "note": "Proposed descriptor — autonomic evidence pending (Bosi & Goldberg, 2003)",
+        "note": "Proposed descriptor, autonomic evidence pending. Unweighted "
+                "geometric-to-arithmetic mean ratio, a measure of tonality "
+                "rather than of a perceptual attribute. The reporting set "
+                "recommends the perceptual variant, in which the energy at "
+                "each frequency is weighted by the masking energy there "
+                "(Bosi & Goldberg, 2003, p. 218); that variant needs a "
+                "masking model and is not implemented yet",
     })
     return items
 

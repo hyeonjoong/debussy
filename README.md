@@ -58,7 +58,42 @@ the caller, since no analyser can determine them.
 | 8 | Harmonicity / HNR | dB | `hnr_db` |
 | 9 | Lyrics presence | yes/no | `lyrics` *(caller-supplied)* |
 | 10 | Delivery method | categorical | `delivery` *(caller-supplied)* |
-| 11 | Spectral flatness | [0, 1] | `spectral_flatness` |
+| 11 | Spectral flatness | [0, 1] | `spectral_flatness` (unweighted; see note) |
+
+Beyond the eleven reporting items, `Result` also carries descriptors that
+qualify them: `beat_agreement` and `onset_flux` say whether the tempo estimate
+applies at all, `modulation_peak_prominence_db` says how well defined the
+modulation rate is, and `ioi_cv` with `npvi` describe how evenly the events are
+spaced. Tempo and modulation rate answer how fast; these answer how evenly, and
+two stimuli matched for mean tempo can differ only in the latter.
+
+`truncation_clicks` is a stimulus-quality check: it counts points where audible
+signal steps straight to digital silence, which happens when events are cut
+rather than faded. Such a step is broadband, so it is audible as a click and is
+detected as an onset, which inflates the onset count and every interval
+statistic derived from it. Read it before reading `ioi_cv`. `abrupt_endings`
+is its companion and answers the question the other way round, by counting
+endings the onset detector actually fires on: a fade short enough to remove
+the step can still leave an ending that reaches the statistics, so a clean
+bill needs both at zero.
+
+`event_rate_per_min` is 60 over the median inter-onset interval, reported
+beside `tempo_bpm`. Where each beat carries one event the two agree; where
+the timing is jittered the interval median holds and the envelope estimate
+does not; where a beat carries several events the interval median tracks the
+subdivision. Their ratio is the reading, not either alone.
+
+Item 11 is reported as the unweighted geometric-to-arithmetic mean ratio, a
+measure of tonality. The reporting set recommends the perceptual variant, in
+which the energy at each frequency is weighted by the masking energy there
+(Bosi & Goldberg, 2003, p. 218). The masking model it needs is implemented in
+`debussy.masking`, as MPEG-1 Psychoacoustic Model 1 (ISO/IEC 11172-3 Annex
+D.1), checked against the published absolute threshold, Zwicker's critical
+bands and the spreading function's documented asymmetry. The weighted
+flatness itself is not settled and is not reported: the masked threshold is
+derived from the signal, so dividing by it flattens a pure tone more than it
+flattens noise, which inverts the ordering. The unweighted value is what the
+tool returns and should not be read as perceptual.
 
 `Result` additionally carries crest factor and temporal-coverage descriptors as
 diagnostics beyond the guideline.

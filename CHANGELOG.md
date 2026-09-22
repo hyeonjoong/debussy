@@ -8,6 +8,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+- `debussy.masking`, an implementation of MPEG-1 Psychoacoustic Model 1
+  (ISO/IEC 11172-3 Annex D.1): threshold in quiet, Bark scale, tonal and
+  noise masker identification and decimation, the level-dependent spreading
+  function, and the global masked threshold. Marina Bosi named this model as
+  the reference to follow when we asked which one to take for item 11 of the
+  reporting set.
+
+  The standard's conformance vectors are not public, so this is not certified
+  bit-exact and does not claim to be. It is checked against every published
+  quantity it is built from and every property it must have: the absolute
+  threshold against the Terhardt formula and at its minimum, the Bark scale
+  against Zwicker's tabulated band edges to within a fifth of a Bark, the
+  spreading function's continuity at all three breakpoints together with its
+  upward asymmetry and level dependence, tonal-versus-noise classification by
+  power share rather than masker count, reduction to the threshold in quiet
+  on silence, monotonicity in masker level at roughly a decibel per decibel,
+  and locality. One of those checks caught a 3 dB error in the level
+  normalisation during development, which would have biased every threshold
+  because the spreading function is level-dependent.
+
+  The perceptually weighted flatness this enables is deliberately not
+  included. The masked threshold is derived from the signal, so dividing the
+  signal by it flattens whatever is measured and a pure tone comes out
+  flatter than noise, inverting the ordering a tonality measure has to
+  produce. Which normalisation the source intends is a question for the
+  author rather than for guesswork, and it is outstanding.
+
+### Added
+
+- CI runs the test matrix on Python 3.13 and 3.14, and the matching
+  classifiers are declared (#20). `requires-python` has always been `>=3.10`
+  with no upper bound, so pip installed on both and nothing verified that
+  the package ran. Both pass on Linux and macOS; the matrix was added first
+  and the classifiers only after reading the result.
+
 - **Tests for the statistics in `validation/`** (`tests/test_validation_stats.py`).
   `sensitivity_power.py` and `analyze_results.py` each implement
   Benjamini-Hochberg, Cliff's delta and the sign-agreement count by hand in a
@@ -21,12 +57,157 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   validation scripts read the matrices with it.
 
 ### Fixed
+
 - `analyze_results.cliffs_delta` no longer dilutes its result when passed NaN.
   A NaN compares False in both directions, so it stayed in the `x.size * y.size`
   denominator while contributing to neither count, pulling the delta towards
-  zero. Its callers drop NaNs before calling, so no published number changes —
-  `data/summary_statistics.csv` regenerates byte-identical — but the function
-  now matches its docstring and its sibling in `sensitivity_power.py`.
+  zero. Its callers drop NaNs before calling, so no published number changes:
+  the summary table regenerates byte-identical with and without the fix. The
+  function now matches its docstring and its sibling in `sensitivity_power.py`.
+
+## [0.4.0] — 2026-09-21
+
+### Added
+
+- `abrupt_endings()` with `ABRUPT_ENDING_WINDOW_MS`, and `event_rate_per_min()`.
+  `Result` gains `abrupt_endings` and `event_rate_per_min`. These close the two
+  limitations recorded against the previous entries.
+
+  `abrupt_endings` counts endings that the onset detector fires on, rather
+  than endings whose waveform steps. `truncation_clicks` asks what the
+  waveform does and answers by the level at the cut, which is right for
+  audibility and wrong for whether the statistics can be trusted: a 5 ms fade
+  drops the last audible sample below the truncation floor while the
+  transition is still fast enough to be detected, so the piano stimuli that
+  prompted this reported zero clicks at a 5 ms fade and still returned twice
+  the true onset count. Both are reported; a clean bill needs both at zero.
+  Calibrated on 2,921 silence transitions: the window captures 97.5 per cent
+  of endings in files whose onset count is demonstrably corrupted and none in
+  files that are not. Across 54 runs of the stimuli that prompted it (18
+  files at three fade lengths) the flag agrees with whether the onset count
+  is corrupted in every case, and no file in the 60-track validation corpus
+  is flagged.
+
+  `event_rate_per_min` reports 60 over the median inter-onset interval beside
+  `tempo_bpm`, which estimates periodicity from the onset envelope. The two
+  agree on material with one event per beat and come apart where it matters:
+  on jittered sequences with an interval coefficient of variation near 0.12
+  the envelope estimate missed the constructed tempo by a median of 12.3 BPM
+  and was withheld for two of nine files, while the interval median recovered
+  it to within 0.8 BPM for all nine. It does not replace `tempo_bpm`, because
+  on music the interval median tracks subdivisions, running a median of 2.3
+  times the envelope tempo across the validation corpus. Their ratio is the
+  reading: near one the events are the beat.
+
+- `truncation_clicks()`, counting points where audible signal steps straight
+  to digital silence, with `TRUNCATION_FLOOR_DB`. `Result` gains
+  `truncation_clicks` and `truncation_max_step_db`, and a non-zero count is
+  stated in the analysis notes. Found in stimuli sent by Kyurim Kang: each
+  rendered drum and piano event ended in a step of -32 and -20 dB relative to
+  peak, which is broadband and therefore detected as an onset, so an
+  isochronous sequence returned twice the true event count and a coefficient
+  of variation of 0.52 where the constructed value was zero. Metronome events
+  in the same set were cut identically but had decayed to -62 dB first, so no
+  click resulted. The level at the cut is what decides it, not the cut. Zero
+  false positives across the 60-track validation corpus. The check detects a
+  step into digital silence, not an ending that is faded but still abrupt, so
+  a zero count does not on its own certify the endings: in the same set a 5 ms
+  fade cleared the drum events but the piano events needed about 20 ms.
+
+- `timing_regularity()`, reporting `ioi_median_s`, `ioi_cv` and `npvi`, and
+  `modulation_peak()`, which returns the modulation rate together with
+  `prominence_db`, the peak height over the median of the analysis band. All
+  four appear in `Result`. Reported by Kyurim Kang, who crossed three timbres
+  with periodic and aperiodic timing at a fixed mean tempo and found that
+  nothing then reported distinguished the two: tempo and modulation rate both
+  describe how fast events recur, neither describes how evenly. On those
+  stimuli the coefficient of variation separates the conditions completely and
+  recovers the constructed jitter to within 0.04.
+- `tests/test_timing_regularity.py`: the same construction, so the measured
+  variability is checked against the built-in value rather than assumed, plus
+  the measurement floor, sparse input and degenerate input.
+
+- `beat_agreement()` and `onset_flux()`, with reference constants
+  `BEAT_AGREEMENT_REFERENCE`, `ONSET_FLUX_REFERENCE` and
+  `TEMPO_TEST_MIN_DURATION_S`, deciding whether a tempo estimate applies to a
+  signal at all (#31). `Result` gains `beat_agreement` and `onset_flux`, both
+  reported beside `tempo_bpm` so a withheld tempo carries the evidence for
+  withholding it.
+- `tests/test_tempo_applicability.py`: fifteen synthesised signals whose answer
+  is fixed by construction, checked at four excerpt lengths. The public tempo
+  benchmarks annotate a wide range of tempi but contain almost no material with
+  no tempo, so the beatless class has to be constructed rather than found.
+
+### Changed
+
+- `tempo_bpm()` returns `None` unless both conditions hold. A beat tracker
+  returns a number for any input; given material with no recurring onsets it
+  returns the mode of its own tempo prior, which reads as a confident estimate
+  and is an artefact. Pass both statistics as `None` for the unchecked
+  estimate.
+- Validated against the 998 GTZAN tracks carrying human tempo annotations
+  (Marchand & Peeters). The rule withholds tempo from 15.2 per cent of them and
+  raises the accuracy of the tempi still reported, measured against those
+  annotations with octave and 3:2 relations allowed, from 92.1 to 97.4 per
+  cent. Over a third of the withheld tracks carried an estimate that did not
+  match the annotation in any case.
+- On the 60-track validation corpus the rule withholds tempo from all 20
+  beatless sleep-audio tracks and from 10 of the 40 music tracks. No other
+  parameter is affected: checked by recomputing the published matrix, where
+  all fourteen non-tempo numeric columns agree to within 0.0000 per cent.
+  Analysis cost rises by about 0.4 s per 45 s excerpt.
+- Withholding costs about 1.7 correct tempi for each incorrect one it
+  suppresses, and is concentrated in slow, rubato and non-percussive material:
+  classical loses 48 per cent of tracks and jazz 29, against 4 to 14 per cent
+  elsewhere. That follows difficulty rather than genre, since the unchecked
+  estimator was right on only 62 per cent of the withheld classical tracks
+  against 96 per cent of those kept. Both statistics are reported in `Result`
+  and the check is opt-out, so nothing is lost that a caller wants to keep.
+- `modulation_peak_hz()` no longer reports a rate for silence. An all-zero
+  envelope spectrum has an argmax like any other, and its frequency was being
+  returned as though it were a measurement. A constant signal still returns a
+  rate, because the analytic envelope of a constant has edge artefacts, but it
+  comes with a prominence near 0 dB, which is what that number is for: across
+  the 60-track corpus the lowest prominence is about 15 dB.
+- Mean and median attack time can differ substantially on material whose
+  onsets are not uniform, and the median is the more stable summary. Both were
+  already reported; the documentation now says which to prefer and why.
+
+
+### Notes
+
+Method after Holzapfel, Davies, Zapata, Oliveira & Gouyon (2012), "Selective
+sampling for beat tracking evaluation", IEEE TASLP 20(9), 2539-2548: mutual
+agreement between independent trackers identifies material on which beat
+tracking fails, without ground truth.
+
+Single statistics computed from one onset envelope were tried first and do not
+work. Onset density is actively misleading, scoring broadband noise above
+music. Autocorrelation peak prominence, tempogram contrast, onset flux alone
+and window-to-window tempo agreement each separate the synthetic controls but
+reject 87 per cent or more of annotated music at any threshold that also
+rejects the controls. The pulse-clarity model of Lartillot, Eerola, Toiviainen
+& Fornari (2008) grades how clear an existing pulse is and is not an
+applicability test: a sustained tone has a near-constant onset envelope whose
+autocorrelation stays high at every lag.
+
+Agreement alone is not enough either, and not length-stable: a tone under very
+slow amplitude modulation has almost no onsets, but every committee member
+locks onto the same swell, so they agree with each other while agreeing about
+nothing in the signal, and it crosses the agreement reference at some excerpt
+lengths and not others. Onset flux separates that case with a wide margin and
+at no cost, since sustained tones, chords and slow swells reach 0.086 at most
+while the lowest of the 998 annotated tracks is 0.609, and the condition
+withholds none of them.
+
+Both statistics are computed after resampling to a fixed internal rate, and
+flux is the mean onset envelope rather than that mean divided by signal RMS.
+The RMS normalisation looks natural and is wrong: the envelope is a difference
+of log-magnitude spectra and already carries no level dependence, so dividing
+by RMS introduces one, and a click train raised 12 dB would lose its tempo.
+The hop length is fixed in samples, so without resampling the envelope mean of
+one click train spans 0.165 to 0.665 across 16 to 48 kHz. Tests cover both
+invariances.
 
 ## [0.3.0] — 2026-09-03
 

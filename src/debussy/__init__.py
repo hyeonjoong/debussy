@@ -13,7 +13,8 @@ metadata, and additive temporal-coverage descriptors
 the stimulus that crosses each Tier-1 reference value — so a long clip that is
 calm on average no longer hides brief harsh passages.
 See the :mod:`debussy.level`, :mod:`debussy.envelope`, :mod:`debussy.spectral`,
-:mod:`debussy.tonal`, and :mod:`debussy.psychoacoustic` submodules for the
+:mod:`debussy.tonal`, :mod:`debussy.psychoacoustic`, and
+:mod:`debussy.masking` submodules for the
 parameter-family groupings.
 """
 from ._core import (
@@ -23,6 +24,17 @@ from ._core import (
     print_report,
     write_csv,
     # Tier framework
+    beat_agreement,
+    onset_flux,
+    timing_regularity,
+    truncation_clicks,
+    abrupt_endings,
+    event_rate_per_min,
+    ABRUPT_ENDING_WINDOW_MS,
+    TRUNCATION_FLOOR_DB,
+    modulation_peak,
+    BEAT_AGREEMENT_REFERENCE,
+    ONSET_FLUX_REFERENCE,
     tier1_items,
     tier2_items,
     tier3_items,
@@ -44,13 +56,24 @@ from ._tiers import (
     parameters_in_tier,
 )
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 __all__ = [
     "analyze_audio",
     "analyse",
     "Result",
     "print_report",
     "write_csv",
+    "beat_agreement",
+    "onset_flux",
+    "timing_regularity",
+    "truncation_clicks",
+    "abrupt_endings",
+    "event_rate_per_min",
+    "ABRUPT_ENDING_WINDOW_MS",
+    "TRUNCATION_FLOOR_DB",
+    "modulation_peak",
+    "BEAT_AGREEMENT_REFERENCE",
+    "ONSET_FLUX_REFERENCE",
     "tier1_items",
     "tier2_items",
     "tier3_items",
