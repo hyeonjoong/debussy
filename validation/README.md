@@ -26,7 +26,7 @@ All audio was standardised to 44.1 kHz mono 16-bit PCM WAV before analysis.
 |---|---|
 | `data/audio_manifest.csv` | One row per track: ID, subcategory, source ID, durations, output filename, artist/title/genre |
 | `data/parameters_60tracks.csv` | Raw per-track output of `analyze_audio()` — every reporting parameter plus run metadata |
-| `data/summary_statistics.csv` | Per-parameter medians, Cliff's δ and Mann–Whitney *p* for A-vs-B, and δ for C-vs-A / C-vs-B |
+| `data/summary_statistics.csv` | Per-parameter medians, Cliff's δ, Mann–Whitney *p* and Benjamini–Hochberg *q* for A-vs-B, and δ for C-vs-A / C-vs-B |
 | `data/run_metadata.json` | Category counts and timing for the published run (2026-05-27) |
 | `run_validation.py` | Manifest + audio → parameter matrix |
 | `analyze_results.py` | Parameter matrix → summary statistics + distribution figure |
