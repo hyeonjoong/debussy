@@ -44,6 +44,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the package ran. Both pass on Linux and macOS; the matrix was added first
   and the classifiers only after reading the result.
 
+### Fixed
+
+- `validation/data/summary_statistics.csv` is regenerated so it matches what
+  `validation/analyze_results.py` actually writes. The shipped copy was the
+  output of the 2026-05-27 run; the script published alongside it in 618af22
+  had already been extended to append the Benjamini–Hochberg column, and the
+  artefact was never re-run. So the file was missing `BH_q_A_vs_B` — the
+  correction the validation section's headline claim rests on — and labelled
+  one parameter `Spectral slope β` where the script emits `Spectral slope
+  beta`. Following the reproduction command in `validation/README.md` gave a
+  file that differed from the one in the repository.
+
+  No number changes: every column the two versions share is byte-identical,
+  and the new column reproduces the q-values already quoted in prose
+  (smallest *q* = 0.189, none survive correction across the twelve tests).
+
 ## [0.4.0] — 2026-09-21
 
 ### Added
