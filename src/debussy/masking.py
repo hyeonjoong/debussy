@@ -42,11 +42,14 @@ Conventions
 Analysis runs at a fixed 48 kHz with a 512-point FFT, the Layer I
 configuration the Annex D index rules are written for, so the tonal
 neighbourhood widths are the standard's own rather than a reinterpretation.
-Input at another rate is resampled. A full-scale sine reads 96 dB SPL, the
-standard's normalisation.
-"""
-from typing import Optional
+A full-scale sine reads 96 dB SPL, the standard's normalisation.
 
+The caller supplies the framing: ``global_masking_threshold_db`` takes one
+frame of exactly ``MODEL_NFFT`` samples and has no sample-rate argument, so
+it does not resample and cannot detect a frame that is not at ``MODEL_SR``.
+Resample to 48 kHz before calling; any other frame length raises
+``ValueError``.
+"""
 import numpy as np
 
 #: Analysis rate and transform size: the Layer I configuration that Annex D's
@@ -210,7 +213,11 @@ def global_masking_threshold_db(frame: np.ndarray) -> np.ndarray:
     """Masked threshold per FFT bin, dB SPL, for one frame.
 
     The power sum of the threshold in quiet and every individual masker's
-    contribution (Annex D.1, step 5).
+    contribution (Annex D.1, step 5), so never below the threshold in quiet.
+
+    ``frame`` must be ``MODEL_NFFT`` samples sampled at ``MODEL_SR``; any
+    other length raises ``ValueError``. Returns ``MODEL_NFFT // 2 + 1``
+    values, one per real-FFT bin.
     """
     spl = _power_spectrum_db(frame)
     freqs = np.fft.rfftfreq(MODEL_NFFT, 1.0 / MODEL_SR)

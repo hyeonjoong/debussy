@@ -197,3 +197,15 @@ def test_degenerate_input_is_handled():
         g = global_masking_threshold_db(sig)
         assert g.shape == FREQS.shape
         assert np.all(np.isfinite(g))
+
+
+def test_a_frame_of_the_wrong_length_is_rejected():
+    """The model is specified at one frame size, and the module says so.
+
+    A frame of any other length has to fail rather than be quietly padded or
+    truncated: the bin grid is fixed by MODEL_NFFT and MODEL_SR, so a frame of
+    the wrong length would place every masker at the wrong frequency.
+    """
+    for n in (MODEL_NFFT // 2, MODEL_NFFT - 1, MODEL_NFFT + 1, 2 * MODEL_NFFT):
+        with pytest.raises(ValueError):
+            global_masking_threshold_db(np.zeros(n))
