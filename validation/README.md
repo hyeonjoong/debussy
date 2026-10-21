@@ -26,7 +26,7 @@ All audio was standardised to 44.1 kHz mono 16-bit PCM WAV before analysis.
 |---|---|
 | `data/audio_manifest.csv` | One row per track: ID, subcategory, source ID, durations, output filename, artist/title/genre |
 | `data/parameters_60tracks.csv` | Raw per-track output of `analyze_audio()` — every reporting parameter plus run metadata |
-| `data/summary_statistics.csv` | Per-parameter medians, Cliff's δ and Mann–Whitney *p* for A-vs-B, and δ for C-vs-A / C-vs-B |
+| `data/summary_statistics.csv` | Per-parameter medians, Cliff's δ and Mann–Whitney *p* for A-vs-B, δ for C-vs-A / C-vs-B, and `BH_q_A_vs_B`, the Benjamini-Hochberg *q* across the twelve A-vs-B tests |
 | `data/run_metadata.json` | Category counts and timing for the published run (2026-05-27) |
 | `run_validation.py` | Manifest + audio → parameter matrix |
 | `analyze_results.py` | Parameter matrix → summary statistics + distribution figure |
@@ -43,10 +43,16 @@ All audio was standardised to 44.1 kHz mono 16-bit PCM WAV before analysis.
 pip install -e ".[plot]" pandas
 python validation/analyze_results.py            # writes validation/results/
 python validation/analyze_results.py --no-figure  # statistics only, no matplotlib
+python validation/analyze_results.py --check      # is data/ still this script's output?
 ```
 
 This reproduces the summary statistics and the twelve-panel distribution figure,
 including the Benjamini–Hochberg correction across the twelve A-vs-B tests.
+
+`data/summary_statistics.csv` is the `--no-figure` output, line for line.
+`--check` recomputes the table and exits non-zero if the two have drifted apart,
+naming the lines that differ; rewrite the file with `--no-figure --out-dir
+validation/data` whenever the statistics change.
 
 To regenerate the parameter matrix from audio you need the standardised WAVs:
 

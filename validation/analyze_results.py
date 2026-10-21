@@ -16,10 +16,12 @@ Usage
 -----
     python validation/analyze_results.py
     python validation/analyze_results.py --parameters results/parameters.csv --out-dir results/
+    python validation/analyze_results.py --check   # exit 1 if data/ is out of date
 """
 from __future__ import annotations
 
 import argparse
+from itertools import zip_longest
 from pathlib import Path
 
 import numpy as np
@@ -84,6 +86,31 @@ def benjamini_hochberg(pvals) -> np.ndarray:
     out[order] = np.minimum(ranked, 1.0)
     q[ok] = out
     return q
+
+
+def check_published(csv_text: str, published: Path) -> int:
+    """Compare freshly computed statistics against the published artefact.
+
+    Returns a process exit status: 0 if every line matches, 1 otherwise. The
+    2026-05-27 artefact went without this guard: it was committed beside a
+    version of this script that had since grown the BH column, so the published
+    file stopped being the output of the published code and nobody noticed.
+    """
+    if not published.exists():
+        print(f"MISSING: {published}")
+        return 1
+    computed, shipped = csv_text.splitlines(), published.read_text().splitlines()
+    if computed == shipped:
+        print(f"OK: {published} is the output of this script")
+        return 0
+    print(f"DRIFT: {published} is not the output of this script")
+    for i, (old, new) in enumerate(zip_longest(shipped, computed), start=1):
+        if old != new:
+            print(f"  line {i}:")
+            print(f"    published: {old if old is not None else '(absent)'}")
+            print(f"    computed:  {new if new is not None else '(absent)'}")
+    print("Refresh it with: analyze_results.py --no-figure --out-dir validation/data")
+    return 1
 
 
 def make_figure(groups, out_base: Path) -> None:
@@ -154,9 +181,14 @@ def main(argv=None) -> int:
                     help="Where to write outputs (default: validation/results)")
     ap.add_argument("--no-figure", action="store_true",
                     help="Skip the figure (avoids the matplotlib dependency)")
+    ap.add_argument("--check", action="store_true",
+                    help="Compare the statistics with the published "
+                         "data/summary_statistics.csv and exit 1 if any line differs; "
+                         "writes nothing and draws no figure")
     args = ap.parse_args(argv)
 
-    args.out_dir.mkdir(parents=True, exist_ok=True)
+    if not args.check:
+        args.out_dir.mkdir(parents=True, exist_ok=True)
     df = pd.read_csv(args.parameters)
     df["CategoryGroup"] = df["Subcategory"].map(category_of)
     groups = tuple(df[df["CategoryGroup"] == g] for g in ("A", "B", "C"))
@@ -184,6 +216,10 @@ def main(argv=None) -> int:
 
     summary = pd.DataFrame(rows)
     summary["BH_q_A_vs_B"] = np.round(benjamini_hochberg(summary["MWU_p_A_vs_B"]), 4)
+    if args.check:
+        return check_published(summary.to_csv(index=False),
+                               HERE / "data" / "summary_statistics.csv")
+
     out_csv = args.out_dir / "summary_statistics.csv"
     summary.to_csv(out_csv, index=False)
     print(f"  statistics   -> {out_csv}")
