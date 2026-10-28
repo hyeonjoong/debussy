@@ -44,6 +44,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the package ran. Both pass on Linux and macOS; the matrix was added first
   and the classifiers only after reading the result.
 
+- **Tests for the statistics in `validation/`** (`tests/test_validation_stats.py`).
+  `sensitivity_power.py` and `analyze_results.py` each implement
+  Benjamini-Hochberg, Cliff's delta and the sign-agreement count by hand in a
+  few lines, where a sign flip or an off-by-one would change a published number
+  without changing anything a reader can see. Both copies are now checked
+  against `scipy.stats.false_discovery_control` and a quadratic
+  straight-from-the-definition BH, against hand-computed Cliff's delta cases
+  including ties and NaN, and end-to-end on the released matrices for the
+  reported counts (11/12 for the primary sensitivity arm, and the 60-track
+  benchmark's null). `pandas` is now part of the `test` extra, since the
+  validation scripts read the matrices with it.
+
+### Fixed
+
+- `analyze_results.cliffs_delta` no longer dilutes its result when passed NaN.
+  A NaN compares False in both directions, so it stayed in the `x.size * y.size`
+  denominator while contributing to neither count, pulling the delta towards
+  zero. Its callers drop NaNs before calling, so no published number changes:
+  the summary table regenerates byte-identical with and without the fix. The
+  function now matches its docstring and its sibling in `sensitivity_power.py`.
+
 ## [0.4.0] — 2026-09-21
 
 ### Added

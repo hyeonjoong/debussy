@@ -173,7 +173,7 @@ def report_arm(title: str, df: pd.DataFrame, primary_deltas=None):
     return deltas
 
 
-def main() -> int:
+def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--matrix", default=str(HERE / "data/parameters_sensitivity_narrow150.csv"),
                     help="primary arm: published bands, n=150 per group")
@@ -183,7 +183,7 @@ def main() -> int:
                     help="independent-corpus arm; pass '' to skip")
     ap.add_argument("--power", action="store_true",
                     help="also simulate power at the primary arm's effect sizes")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     primary = report_arm("PRIMARY — published bands held fixed, n raised to 150",
                          pd.read_csv(args.matrix))
