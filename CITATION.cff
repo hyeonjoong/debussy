@@ -1,0 +1,36 @@
+cff-version: 1.2.0
+message: >-
+  If you use DEBUSSY in your research, please cite the software using the
+  metadata below, giving the version you ran.
+title: >-
+  DEBUSSY: a Python toolbox implementing an eleven-item minimum acoustic
+  reporting guideline for autonomic-arousal stimuli
+type: software
+authors:
+  - family-names: Kim
+    given-names: Hyeon-Joong
+    orcid: "https://orcid.org/0000-0002-2898-0464"
+    affiliation: Bell Therapeutics
+  - family-names: Park
+    given-names: Jonghwa Jeonglok
+    orcid: "https://orcid.org/0000-0002-0097-5196"
+    affiliation: Bell Therapeutics
+  - family-names: Kang
+    given-names: Kyurim
+    orcid: "https://orcid.org/0000-0001-8061-4456"
+    affiliation: Johns Hopkins University School of Medicine
+  - family-names: Eerola
+    given-names: Tuomas
+    orcid: "https://orcid.org/0000-0002-2896-929X"
+repository-code: "https://github.com/hyeonjoong/debussy"
+url: "https://hyeonjoong.github.io/debussy/"
+license: MIT
+version: 0.4.0
+date-released: "2026-09-21"
+keywords:
+  - audio analysis
+  - psychoacoustics
+  - music information retrieval
+  - autonomic arousal
+  - auditory stimuli
+  - reproducibility
