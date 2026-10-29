@@ -26,7 +26,7 @@ affiliations:
     index: 1
   - name: Center for Music and Medicine, Johns Hopkins University School of Medicine, Baltimore, MD, USA
     index: 2
-  - name: Department of Music, Durham University, United Kingdom
+  - name: Centre of Excellence in Music, Mind, Body and Brain, Department of Music, Art and Culture Studies, University of Jyväskylä, Finland
     index: 3
 date: 10 August 2026
 bibliography: paper.bib
@@ -130,16 +130,20 @@ calibration offset, since LAeq is uncalibrated dBFS by default.
 
 # AI usage disclosure
 
-Drafting of this manuscript, parts of the test scaffolding, and the
-standardisation and batch scripts used Claude (Anthropic) and ChatGPT (OpenAI)
-under human authorial review. All algorithmic implementations, validation runs,
-figures and final wording were verified by the authors. No generative AI
-produced, edited or curated the audio data or annotations the validation rests
-on.
+Generative AI was used substantially. Claude (Anthropic) wrote much of the
+library code, tests, documentation and validation scripts, including pull
+requests opened by an unattended maintenance session that works from the
+public issue tracker, and Claude and ChatGPT (OpenAI) were used in drafting
+this manuscript. The problem framing, the choice of the eleven items and their
+reference values, and the validation design are the authors'. The authors
+reviewed the AI-assisted code and text and take responsibility for both. No
+generative AI produced, edited or curated the audio data or annotations the
+validation rests on.
 
 # Acknowledgements
 
-We thank the Bell Therapeutics Neurotech Research Institute team for
+We thank Marina Bosi for advising which psychoacoustic model item 11 should
+follow, the Bell Therapeutics Neurotech Research Institute team for
 clinical-side requirements and operational support, and the `librosa` and
 `MOSQITO` communities, on whose work DEBUSSY builds directly.
 
