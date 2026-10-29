@@ -44,6 +44,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the package ran. Both pass on Linux and macOS; the matrix was added first
   and the classifiers only after reading the result.
 
+### Added
+
+- A reference page for `debussy.masking` on the documentation site, and a
+  pointer to it from the API overview. The module was published with no page
+  of its own while every other submodule had one, so the only description of
+  a public module was its source. The page states the calling convention and
+  the constants, walks the four steps of the threshold calculation, and
+  records what the tests do and do not establish. Every figure quoted in it
+  was measured from the module rather than carried over from the commit that
+  added it.
+
+  The overview says plainly that `analyze_audio()` does not call the module
+  and that no field of `Result` comes from it, so a reader cannot mistake the
+  masked threshold for a reported parameter while the weighted flatness is
+  still outstanding.
+
 - **Tests for the statistics in `validation/`** (`tests/test_validation_stats.py`).
   `sensitivity_power.py` and `analyze_results.py` each implement
   Benjamini-Hochberg, Cliff's delta and the sign-agreement count by hand in a
@@ -57,6 +73,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   validation scripts read the matrices with it.
 
 ### Fixed
+
+- `debussy.masking` claimed in its module docstring that input at a sample
+  rate other than 48 kHz "is resampled". It is not, and it cannot be:
+  `global_masking_threshold_db` takes one frame and has no sample-rate
+  argument, so a frame at the wrong rate is read as if it were at 48 kHz and
+  every masker lands at the wrong frequency. The docstring now states the
+  real contract, that the caller resamples and frames, and the frame length
+  it requires. `tests/test_masking.py` pins that a frame of any other length
+  is rejected rather than quietly padded or truncated.
+
+  Also dropped an unused `typing.Optional` import from the same module.
 
 - `analyze_results.cliffs_delta` no longer dilutes its result when passed NaN.
   A NaN compares False in both directions, so it stayed in the `x.size * y.size`

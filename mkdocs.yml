@@ -43,6 +43,7 @@ nav:
     - Spectral: api/spectral.md
     - Tonal: api/tonal.md
     - Psychoacoustic: api/psychoacoustic.md
+    - Masking: api/masking.md
   - Validation: validation.md
   - Reference ranges: reference_ranges.md
   - Comparison with other tools: comparing_with_other_tools.md

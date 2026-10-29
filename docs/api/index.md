@@ -100,6 +100,11 @@ whole pipeline.
 - [Tonal](tonal.md) — HNR, spectral flatness
 - [Psychoacoustic](psychoacoustic.md) — roughness, sharpness
 
+One further submodule sits outside the pipeline. [Masking](masking.md) is
+MPEG-1 Psychoacoustic Model 1, the groundwork for the perceptually weighted
+flatness of item 11. `analyze_audio()` does not call it, and no field of
+`Result` comes from it.
+
 ## Plotting
 
 `plot_spectrogram`, `plot_parameter_radar`, `plot_tier_compliance` and
