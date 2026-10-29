@@ -162,17 +162,10 @@ published matrix with no audio required.
 
 ## Citation
 
-If you use DEBUSSY in your research, please cite:
-
-```bibtex
-@article{Kim2026,
-  title   = {DEBUSSY: A Python toolbox for the eleven-item minimum acoustic reporting guideline for autonomic-arousal stimuli},
-  author  = {Kim, Hyeon-Joong and others},
-  year    = {2026},
-  journal = {Journal of Open Source Software},
-  note    = {Manuscript in preparation}
-}
-```
+If you use DEBUSSY in your research, please cite the software and the version
+you ran. Citation metadata is in [`CITATION.cff`](CITATION.cff); GitHub's
+"Cite this repository" button in the sidebar renders it as APA or BibTeX. A
+software paper is in preparation and will be added here when it is published.
 
 ## Architecture
 
