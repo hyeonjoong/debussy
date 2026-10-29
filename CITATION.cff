@@ -23,6 +23,14 @@ authors:
     given-names: Tuomas
     orcid: "https://orcid.org/0000-0002-2896-929X"
     affiliation: University of Jyväskylä
+doi: 10.5281/zenodo.23753201
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.23753201
+    description: Concept DOI, resolves to the latest archived release
+  - type: doi
+    value: 10.5281/zenodo.23753202
+    description: Archived release v0.5.1
 repository-code: "https://github.com/hyeonjoong/debussy"
 url: "https://hyeonjoong.github.io/debussy/"
 license: MIT
