@@ -789,24 +789,33 @@ def psychoacoustics(y: np.ndarray, fs: int, suppress_warnings: bool = False) -> 
         with _quiet():
             R, _, _, _ = roughness_dw(y, fs, overlap=0.5)
         R = np.asarray(R, dtype=float)
-        out["roughness_asper"] = float(np.nanmean(R))
+        finite = R[np.isfinite(R)]
+        if not finite.size:
+            raise ValueError("mosqito returned no finite roughness values")
+        out["roughness_asper"] = float(np.mean(finite))
         # Temporal coverage: share of the duration whose instantaneous roughness
         # exceeds the roughness reference value (ROUGHNESS_REFERENCE_ASPER,
         # defined with the other screening values below — read here rather than
         # repeated, so re-pointing the constant moves the coverage figure with
         # it). The whole-file mean can stay below the reference value while
         # brief rough passages still cross it; coverage exposes that proportion.
-        finite = R[np.isfinite(R)]
-        if finite.size:
-            out["roughness_coverage_pct"] = float(
-                np.mean(finite > ROUGHNESS_REFERENCE_ASPER) * 100.0)
+        out["roughness_coverage_pct"] = float(
+            np.mean(finite > ROUGHNESS_REFERENCE_ASPER) * 100.0)
     except Exception as e:
         out["_roughness_err"] = str(e)
     try:
         from mosqito.sq_metrics import sharpness_din_st
         with _quiet():
             S = sharpness_din_st(y, fs, weighting="din")
-        out["sharpness_acum"] = float(np.nanmean(S))
+        # An all-NaN series (zero loudness, i.e. silence, makes DIN 45692
+        # divide by zero) is undefined, not a value: NaN would slip past every
+        # ``is None`` check downstream and fail the exemplar comparison.
+        S = np.asarray(S, dtype=float)
+        finite = S[np.isfinite(S)]
+        if not finite.size:
+            raise ValueError("mosqito returned no finite sharpness values "
+                             "(zero loudness)")
+        out["sharpness_acum"] = float(np.mean(finite))
     except Exception as e:
         out["_sharpness_err"] = str(e)
     # (Zwicker loudness was previously computed here but never surfaced in

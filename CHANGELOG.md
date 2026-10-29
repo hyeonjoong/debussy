@@ -110,6 +110,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   suite: the validation scripts need pandas and the `test` extra does not
   install it.
 
+- Sharpness on digital silence is `None` with the reason in `Result.notes`,
+  as the troubleshooting page already said it would be, instead of `NaN`.
+  mosqito's DIN 45692 sharpness divides by zero loudness on silence and
+  returns an all-NaN series, and `NaN` passed every `is None` check: the
+  Tier 2 report marked silence `OUT_OF_RANGE` as "Above the provisional
+  exemplar", `to_json()` wrote a bare `NaN` that strict JSON parsers reject,
+  and a Result decoded from its own JSON no longer compared equal to the
+  original. Roughness gets the same guard. Both metrics are unchanged
+  unless mosqito returns no finite value at all, or an infinite one, which
+  is now excluded from the mean rather than propagated.
+
 ## [0.4.0] — 2026-09-21
 
 ### Added
