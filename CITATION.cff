@@ -22,10 +22,11 @@ authors:
   - family-names: Eerola
     given-names: Tuomas
     orcid: "https://orcid.org/0000-0002-2896-929X"
+    affiliation: University of Jyväskylä
 repository-code: "https://github.com/hyeonjoong/debussy"
 url: "https://hyeonjoong.github.io/debussy/"
 license: MIT
-version: 0.5.0
+version: 0.5.1
 date-released: "2026-10-29"
 keywords:
   - audio analysis

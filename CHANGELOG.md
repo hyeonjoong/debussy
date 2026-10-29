@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-29
+
+This is the first release archived on Zenodo, which mints a DOI for each
+release from now on (#10).
+
+### Added
+
+- `.zenodo.json`, so the archive's title, authors, ORCIDs, affiliations and
+  licence come from the repository and match `paper/paper.md`, rather than
+  being edited by hand on Zenodo for each release.
+
 ### Fixed
 
 - CI jobs now time out instead of hanging (#21). The Linux audio-dependency
@@ -550,7 +561,8 @@ First release published to PyPI.
   with no autocorrelation peak above the voicing gate, so HNR is undefined.
   No failures, no out-of-range values.
 
-[Unreleased]: https://github.com/hyeonjoong/debussy/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/hyeonjoong/debussy/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/hyeonjoong/debussy/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/hyeonjoong/debussy/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/hyeonjoong/debussy/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/hyeonjoong/debussy/compare/v0.2.2...v0.3.0

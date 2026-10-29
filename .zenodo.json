@@ -1,0 +1,51 @@
+{
+  "upload_type": "software",
+  "title": "DEBUSSY: a Python toolbox implementing an eleven-item minimum acoustic reporting guideline for autonomic-arousal stimuli",
+  "description": "DEBUSSY measures the eleven-item minimum acoustic reporting guideline for autonomic-arousal stimuli in a single call: LAeq and dynamic range, attack time, tempo and modulation rate, spectral centroid and slope, harmonics-to-noise ratio, spectral flatness, roughness, sharpness, plus caller-recorded lyrics presence and delivery method. Documentation: https://hyeonjoong.github.io/debussy/",
+  "creators": [
+    {
+      "name": "Kim, Hyeon-Joong",
+      "orcid": "0000-0002-2898-0464",
+      "affiliation": "Neurotech Research Institute, Bell Therapeutics, Seoul, Republic of Korea"
+    },
+    {
+      "name": "Park, Jonghwa Jeonglok",
+      "orcid": "0000-0002-0097-5196",
+      "affiliation": "Neurotech Research Institute, Bell Therapeutics, Seoul, Republic of Korea"
+    },
+    {
+      "name": "Kang, Kyurim",
+      "orcid": "0000-0001-8061-4456",
+      "affiliation": "Center for Music and Medicine, Johns Hopkins University School of Medicine, Baltimore, MD, USA"
+    },
+    {
+      "name": "Eerola, Tuomas",
+      "orcid": "0000-0002-2896-929X",
+      "affiliation": "Centre of Excellence in Music, Mind, Body and Brain, University of Jyväskylä, Finland"
+    }
+  ],
+  "license": "MIT",
+  "access_right": "open",
+  "keywords": [
+    "audio analysis",
+    "psychoacoustics",
+    "music information retrieval",
+    "autonomic arousal",
+    "auditory stimuli",
+    "reproducibility",
+    "Python"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/hyeonjoong/debussy",
+      "relation": "isSupplementTo",
+      "resource_type": "software",
+      "scheme": "url"
+    },
+    {
+      "identifier": "https://pypi.org/project/debussy-audio/",
+      "relation": "isIdenticalTo",
+      "scheme": "url"
+    }
+  ]
+}

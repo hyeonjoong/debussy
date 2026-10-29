@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "debussy-audio"
-version = "0.5.0"
+version = "0.5.1"
 description = "Eleven-item minimum acoustic reporting for autonomic-arousal stimulus preparation."
 readme = "README.md"
 requires-python = ">=3.10"
