@@ -10,6 +10,9 @@ on:
 jobs:
   test:
     runs-on: ${{ matrix.os }}
+    # A healthy job takes 4 to 8 minutes. Without a cap, a hung step burns
+    # GitHub's 6-hour default and holds the PR unmergeable for all of it (#21).
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -28,9 +31,19 @@ jobs:
 
       - name: Install system audio deps (Linux)
         if: runner.os == 'Linux'
+        # This is the step that hung on #3, #14, #26 and #27: apt-get waits on a
+        # mirror or the dpkg lock indefinitely. Bound the wait, retry the update,
+        # and fail the step fast so a re-run can clear it.
+        timeout-minutes: 8
+        env:
+          DEBIAN_FRONTEND: noninteractive
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libsndfile1 ffmpeg
+          for attempt in 1 2 3; do
+            sudo apt-get -o DPkg::Lock::Timeout=120 -o Acquire::Retries=3 update && break
+            [ "$attempt" = 3 ] && exit 1
+            sleep 15
+          done
+          sudo apt-get -o DPkg::Lock::Timeout=120 install -y --no-install-recommends libsndfile1 ffmpeg
 
       - name: Install DEBUSSY + test extras
         run: |
