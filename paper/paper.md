@@ -133,13 +133,12 @@ calibration offset, since LAeq is uncalibrated dBFS by default.
 Generative AI was used substantially. Claude (Anthropic) wrote much of the
 library code, tests, documentation and validation scripts, including pull
 requests opened by an unattended maintenance session that works from the
-public issue tracker; ChatGPT (OpenAI) was used in early drafting of this
-manuscript. The problem framing, the choice of the eleven items and their
-reference values, and the validation design are the authors', and the pull
-request history records which changes came from the maintenance session. Every
-number reported here was regenerated from the released code. No generative AI
-produced, edited or curated the audio data or annotations the validation rests
-on.
+public issue tracker, and Claude and ChatGPT (OpenAI) were used in drafting
+this manuscript. The problem framing, the choice of the eleven items and their
+reference values, and the validation design are the authors'. The authors
+reviewed the AI-assisted code and text and take responsibility for both. No
+generative AI produced, edited or curated the audio data or annotations the
+validation rests on.
 
 # Acknowledgements
 
