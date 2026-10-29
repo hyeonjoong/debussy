@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: debussy-docs
+  group: debussy-docs-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- CI jobs now time out instead of hanging (#21). The Linux audio-dependency
+  step had hung on `apt-get update` four times, and with no job timeout each
+  hang held its pull request unmergeable for up to GitHub's six-hour default.
+  The step now bounds the dpkg lock wait, retries the update three times and
+  fails after eight minutes; the job fails after twenty.
+- A documentation build for a pull request no longer cancels the site deploy
+  from `main` (#56). Both shared one concurrency group, so on 2026-10-29 two
+  deploys were cancelled by PR builds started minutes later. The group is now
+  keyed on the ref.
+
 ## [0.5.0] - 2026-10-29
 
 ### Added
