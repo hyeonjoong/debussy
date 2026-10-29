@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-29
+
 ### Added
 
 - `debussy.masking`, an implementation of MPEG-1 Psychoacoustic Model 1
@@ -36,15 +38,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   produce. Which normalisation the source intends is a question for the
   author rather than for guesswork, and it is outstanding.
 
-### Added
-
 - CI runs the test matrix on Python 3.13 and 3.14, and the matching
   classifiers are declared (#20). `requires-python` has always been `>=3.10`
   with no upper bound, so pip installed on both and nothing verified that
   the package ran. Both pass on Linux and macOS; the matrix was added first
   and the classifiers only after reading the result.
-
-### Added
 
 - A reference page for `debussy.masking` on the documentation site, and a
   pointer to it from the API overview. The module was published with no page
@@ -71,6 +69,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reported counts (11/12 for the primary sensitivity arm, and the 60-track
   benchmark's null). `pandas` is now part of the `test` extra, since the
   validation scripts read the matrices with it.
+
+- `CITATION.cff`, so the software can be cited by version from GitHub's
+  sidebar, and GitHub Discussions for usage questions and design arguments
+  from outside the original team (#49).
 
 ### Fixed
 
@@ -536,7 +538,9 @@ First release published to PyPI.
   with no autocorrelation peak above the voicing gate, so HNR is undefined.
   No failures, no out-of-range values.
 
-[Unreleased]: https://github.com/hyeonjoong/debussy/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/hyeonjoong/debussy/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/hyeonjoong/debussy/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/hyeonjoong/debussy/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/hyeonjoong/debussy/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/hyeonjoong/debussy/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/hyeonjoong/debussy/compare/v0.2.0...v0.2.1
