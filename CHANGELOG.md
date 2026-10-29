@@ -92,6 +92,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the summary table regenerates byte-identical with and without the fix. The
   function now matches its docstring and its sibling in `sensitivity_power.py`.
 
+- `validation/data/summary_statistics.csv` is the output of the script
+  published beside it again (#44). The committed file was the 2026-05-27 run,
+  and the commit that published it had extended `analyze_results.py` in the
+  same breath to append Benjamini-Hochberg q-values, without re-running the
+  artefact against the extended script. The published table therefore lacked
+  `BH_q_A_vs_B`, the column the validation section's claim that no A-vs-B
+  contrast survives correction rests on, and spelled one parameter
+  `Spectral slope β` where the script writes `Spectral slope beta`. Every
+  column the two versions share is byte-identical, so no benchmark number
+  moves; what was broken was reproducibility, not arithmetic.
+
+  `analyze_results.py --check` recomputes the table and exits non-zero if the
+  published file has drifted from it, naming the lines that differ, so the
+  claim in `validation/README.md` that the script reproduces the published
+  statistics is now checkable in one command. It is not wired into the test
+  suite: the validation scripts need pandas and the `test` extra does not
+  install it.
+
 ## [0.4.0] — 2026-09-21
 
 ### Added
