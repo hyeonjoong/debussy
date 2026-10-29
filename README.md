@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/hyeonjoong/debussy/actions/workflows/tests.yml/badge.svg)](https://github.com/hyeonjoong/debussy/actions/workflows/tests.yml)
 [![PyPI version](https://img.shields.io/pypi/v/debussy-audio.svg)](https://pypi.org/project/debussy-audio/)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23753201.svg)](https://doi.org/10.5281/zenodo.23753201)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![HuggingFace Demo](https://img.shields.io/badge/🤗-Try%20on%20HF%20Spaces-yellow)](https://huggingface.co/spaces/jjjooong/debussy)
@@ -164,8 +165,13 @@ published matrix with no audio required.
 
 If you use DEBUSSY in your research, please cite the software and the version
 you ran. Citation metadata is in [`CITATION.cff`](CITATION.cff); GitHub's
-"Cite this repository" button in the sidebar renders it as APA or BibTeX. A
-software paper is in preparation and will be added here when it is published.
+"Cite this repository" button in the sidebar renders it as APA or BibTeX.
+
+Every release is archived on Zenodo. The DOI
+[10.5281/zenodo.23753201](https://doi.org/10.5281/zenodo.23753201) always
+resolves to the latest version; each version's record page lists its own DOI,
+which is the one to cite when you need the exact code you ran. A software paper
+is in preparation and will be added here when it is published.
 
 ## Architecture
 

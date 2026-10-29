@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The Zenodo DOI, in the README badge, the README's citation section and
+  `CITATION.cff` (#10). 10.5281/zenodo.23753201 resolves to the latest
+  archived release; 0.5.1 is 10.5281/zenodo.23753202.
+
 ## [0.5.1] - 2026-10-29
 
 This is the first release archived on Zenodo, which mints a DOI for each
