@@ -13,6 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `CITATION.cff` (#10). 10.5281/zenodo.23753201 resolves to the latest
   archived release; 0.5.1 is 10.5281/zenodo.23753202.
 
+### Fixed
+
+- `write_csv` and `--csv` no longer append to a CSV whose header is not the
+  current `Result` schema. `Result` gained fields in 0.4.0, and appending to a
+  report started with 0.3.x wrote the new rows under the old header, so every
+  value after the first missing column sat in the wrong column with no error.
+  It now raises `ValueError` naming the missing and unexpected columns and
+  leaves the file unchanged; the CLI prints the message and exits 1. An
+  existing empty file now gets a header, where before its first data row was
+  read back as one.
+
 ## [0.5.1] - 2026-10-29
 
 This is the first release archived on Zenodo, which mints a DOI for each

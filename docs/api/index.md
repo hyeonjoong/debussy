@@ -88,6 +88,10 @@ from debussy import write_csv
 write_csv([r1, r2, r3], "report.csv")   # appends; header written once
 ```
 
+`write_csv` appends only to a file whose header is the current `Result`
+schema. A report started with a release that had different fields raises
+`ValueError` and is left untouched; write to a new file instead.
+
 ## Family submodules
 
 The per-family functions below are the building blocks `analyze_audio()`
