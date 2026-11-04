@@ -1257,7 +1257,26 @@ def print_report(r: Result) -> None:
 
 def write_csv(results: list[Result], csv_path: str) -> None:
     fields = list(asdict(results[0]).keys())
-    new_file = not os.path.exists(csv_path)
+    new_file = not os.path.exists(csv_path) or os.path.getsize(csv_path) == 0
+    # Result has gained fields between releases, and DictWriter writes by
+    # position under whatever header the file already has. Appending to a
+    # report started with an older version would shift every value after the
+    # first missing column, silently, so refuse before writing anything.
+    if not new_file:
+        with open(csv_path, newline="", encoding="utf-8") as f:
+            header = next(csv.reader(f), [])
+        if header != fields:
+            missing = [k for k in fields if k not in header]
+            extra = [k for k in header if k not in fields]
+            if missing or extra:
+                diff = (f"missing: {', '.join(missing) or 'none'}; "
+                        f"unexpected: {', '.join(extra) or 'none'}")
+            else:
+                diff = "same fields, different order"
+            raise ValueError(
+                f"{csv_path}: existing header does not match the Result fields "
+                f"of this version ({diff}). Write to a new file instead of "
+                f"appending.")
     with open(csv_path, "a", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=fields)
         if new_file:
@@ -1914,7 +1933,11 @@ def main() -> int:
         results.append(r)
 
     if args.csv and results:
-        write_csv(results, args.csv)
+        try:
+            write_csv(results, args.csv)
+        except ValueError as e:
+            print(f"  ERROR: {e}", file=sys.stderr)
+            return 1
         print(f"\n→ wrote {len(results)} row(s) to {args.csv}")
     return 0 if results else 1
 

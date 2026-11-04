@@ -44,3 +44,13 @@ def test_cli_writes_csv(wav, tmp_path):
 def test_cli_missing_file_exits_nonzero(tmp_path):
     r = _run(str(tmp_path / "does_not_exist.wav"))
     assert r.returncode == 1
+
+
+def test_cli_csv_with_a_different_header_exits_nonzero(wav, tmp_path):
+    out = tmp_path / "old.csv"
+    out.write_text("file,laeq_dbfs_a\n", encoding="utf-8")
+    r = _run(wav, "--suppress-warnings", "--csv", str(out))
+    assert r.returncode == 1
+    assert "header" in r.stderr
+    assert "Traceback" not in r.stderr
+    assert out.read_text(encoding="utf-8") == "file,laeq_dbfs_a\n"

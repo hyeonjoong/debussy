@@ -11,7 +11,7 @@ debussy STIMULUS.wav [MORE.wav ...] [options]
 
 | Option | Description |
 |---|---|
-| `--csv PATH` | Append each result as a row to `PATH` (created if missing), in the `Result` field schema. |
+| `--csv PATH` | Append each result as a row to `PATH` (created if missing), in the `Result` field schema. An existing file with a different header is not appended to; the command exits 1. |
 | `--lyrics {yes,no,unknown}` | Record whether the stimulus contains lyrics (default `unknown`). |
 | `--delivery TEXT` | Free-text delivery descriptor (e.g. `headphones`, `free-field`). |
 | `--calibration-offset-db FLOAT` | dB offset added to LAeq for SPL calibration (default `0` → output in dBFS-A). |
