@@ -36,8 +36,13 @@ silences the warning but keeps the note.
 
 Files longer than `DEBUSSY_MAX_ANALYZE_S` (default 50 s) use probe-based
 analysis: level metrics are exact (whole-file stream) but psychoacoustic and
-spectral metrics are the median across evenly spaced probes, and a "clean"
-verdict is never certified from a sample. Check `Result.analysis_mode` — it is
+spectral metrics are the median across evenly spaced 3 s probes, and a "clean"
+verdict is never certified from a sample. Tempo is the exception among the
+sampled metrics: the test that withholds it from beatless material was
+validated from 15 s upward, so `tempo_bpm`, `beat_agreement` and `onset_flux`
+come from evenly spaced 15 s windows instead, and tempo is withheld whenever
+the pooled `beat_agreement` or `onset_flux` is below its reference value.
+Check `Result.analysis_mode` — it is
 `"probe"` (or `"truncated"` when the format cannot be seeked) rather than
 `"full"`.
 

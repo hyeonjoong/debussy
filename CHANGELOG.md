@@ -13,6 +13,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `CITATION.cff` (#10). 10.5281/zenodo.23753201 resolves to the latest
   archived release; 0.5.1 is 10.5281/zenodo.23753202.
 
+### Fixed
+
+- Files longer than `DEBUSSY_MAX_ANALYZE_S` no longer get a tempo for
+  broadband noise. Probe mode ran the tempo applicability test on its 3 s
+  probes, which is well under the 15 s it was validated from; with so few
+  beats the trackers rarely disagree, and 60 s of white noise, withheld when
+  analysed whole, was reported at about 123 BPM. The median was also taken
+  only over probes that reported a tempo, so one passing probe was enough.
+  `tempo_bpm`, `beat_agreement` and `onset_flux` now come from evenly spaced
+  15 s windows, and tempo is withheld when the pooled `beat_agreement` or
+  `onset_flux` falls below its reference value. Files analysed in full,
+  including every benchmark track, are unchanged.
+
 ## [0.5.1] - 2026-10-29
 
 This is the first release archived on Zenodo, which mints a DOI for each
