@@ -235,7 +235,9 @@ _TEMPO_TEST_SR = 22050
 #: Shortest excerpt for which the applicability test was validated. Below this
 #: the committee has too few beats to agree or disagree about; the test is
 #: still applied, since reporting an unchecked tempo is the worse failure, but
-#: results on shorter excerpts are outside what has been verified.
+#: results on shorter excerpts are outside what has been verified. Long files
+#: analysed from probes run the test on windows of this length rather than on
+#: the probes themselves (see ``_probe_tempo``).
 TEMPO_TEST_MIN_DURATION_S = 15.0
 
 
@@ -1088,13 +1090,70 @@ def _stream_level_metrics(path: str, calibration_offset_db: float = 0.0,
             "crest_factor_db": round(crest, 2) if crest is not None else None}
 
 
+def _pool_tempo(windows: list) -> dict:
+    """Pool ``(agreement, flux, tempo)`` triples from the tempo windows of one
+    file. The statistics are the median across windows, and the withholding
+    rule of :func:`tempo_bpm` is applied to those pooled values, so a Result
+    never reports a tempo next to statistics that would have withheld it. The
+    tempo itself is the median over the windows that reported one."""
+    from statistics import median
+
+    def med(i, field):
+        vals = [w[i] for w in windows if w[i] is not None]
+        return round(float(median(vals)), _NDIG[field]) if vals else None
+
+    agree = med(0, "beat_agreement")
+    flux = med(1, "onset_flux")
+    bpm = med(2, "tempo_bpm")
+    if agree is not None and agree < BEAT_AGREEMENT_REFERENCE:
+        bpm = None
+    if flux is not None and flux < ONSET_FLUX_REFERENCE:
+        bpm = None
+    return {"beat_agreement": agree, "onset_flux": flux, "tempo_bpm": bpm}
+
+
+def _probe_tempo(path: str, total: int, fs: int, n_windows: int) -> dict:
+    """Tempo and its applicability statistics for a long file, from evenly
+    spaced windows of :data:`TEMPO_TEST_MIN_DURATION_S`.
+
+    The 3 s probes are too short for the applicability test: with so few beats
+    the committee members have little to disagree about, and white noise that
+    is withheld when analysed whole passes on most of its probes. Beat tracking
+    is cheap next to the psychoacoustic metrics, so the windows can be as long
+    as the shortest excerpt the test was validated on.
+    """
+    import librosa  # lazy
+
+    frames = int(TEMPO_TEST_MIN_DURATION_S * fs)
+    span = total - frames
+    starts = ([0] if span <= 0
+              else [int(round(span * i / (n_windows - 1)))
+                    for i in range(n_windows)])
+    windows = []
+    for s in starts:
+        try:
+            blk, _ = sf.read(path, start=s, stop=min(s + frames, total),
+                             always_2d=False)
+        except Exception:
+            continue
+        if blk.ndim > 1:
+            blk = np.mean(blk, axis=1)
+        blk = blk.astype(np.float64)
+        agree = beat_agreement(blk, fs, librosa)
+        flux = onset_flux(blk, fs, librosa)
+        windows.append((agree, flux, tempo_bpm(blk, fs, librosa,
+                                               agreement=agree, flux=flux)))
+    return _pool_tempo(windows)
+
+
 def _aggregate_probes(results: list, file: str, duration_s: float, fs: int,
                       lyrics: str, delivery: str, note: str,
-                      level_override: dict) -> Result:
+                      level_override: dict, tempo_override: dict) -> Result:
     """Pool per-probe Results: the expensive psychoacoustic / spectral metrics
     are the median across probes; level metrics are overridden with the exact
-    whole-file streamed values; onset count is summed; coverage is pooled but
-    NEVER used to certify "clean" (see tier1_items)."""
+    whole-file streamed values, and tempo with the values from longer tempo
+    windows; onset count is summed; coverage is pooled but NEVER used to
+    certify "clean" (see tier1_items)."""
     from statistics import median
 
     def med(field):
@@ -1116,9 +1175,9 @@ def _aggregate_probes(results: list, file: str, duration_s: float, fs: int,
         attack_median_ms=med("attack_median_ms"),
         attack_sd_ms=med("attack_sd_ms"),
         roughness_asper=med("roughness_asper"),
-        tempo_bpm=med("tempo_bpm"),
-        beat_agreement=med("beat_agreement"),
-        onset_flux=med("onset_flux"),
+        tempo_bpm=tempo_override["tempo_bpm"],
+        beat_agreement=tempo_override["beat_agreement"],
+        onset_flux=tempo_override["onset_flux"],
         modulation_peak_prominence_db=med("modulation_peak_prominence_db"),
         truncation_clicks=med("truncation_clicks"),
         abrupt_endings=med("abrupt_endings"),
@@ -1203,14 +1262,18 @@ def analyse(path: str, lyrics: str = "unknown", delivery: str = "unknown",
     # Level metrics (esp. dynamic range) cannot be recovered from short probes,
     # so compute them exactly over the whole file by streaming.
     level = _stream_level_metrics(path, calibration_offset_db)
+    # The tempo applicability test is not valid on 3 s probes, so tempo comes
+    # from windows as long as the shortest excerpt it was validated on.
+    tempo = _probe_tempo(path, total, fs, n_probes)
     analysed_s = int(len(results) * PROBE_S)
     pct = 100.0 * analysed_s / dur if dur else 0.0
     note = (f"probe-based: {len(results)}x{PROBE_S:.0f}s probes (~{analysed_s}s, "
             f"{pct:.1f}% of {dur:.0f}s); level metrics exact (whole-file stream), "
-            f"psychoacoustic/spectral = median across probes; coverage is a "
+            f"psychoacoustic/spectral = median across probes, tempo from "
+            f"{n_probes}x{TEMPO_TEST_MIN_DURATION_S:.0f}s windows; coverage is a "
             f"sample so 'clean' is NOT certified")
     return _aggregate_probes(results, os.path.basename(path), round(dur, 3),
-                             fs, lyrics, delivery, note, level)
+                             fs, lyrics, delivery, note, level, tempo)
 
 
 def print_report(r: Result) -> None:
