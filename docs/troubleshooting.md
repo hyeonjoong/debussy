@@ -37,7 +37,10 @@ silences the warning but keeps the note.
 Files longer than `DEBUSSY_MAX_ANALYZE_S` (default 50 s) use probe-based
 analysis: level metrics are exact (whole-file stream) but psychoacoustic and
 spectral metrics are the median across evenly spaced probes, and a "clean"
-verdict is never certified from a sample. Check `Result.analysis_mode` — it is
+verdict is never certified from a sample. Onset, truncation-click and
+abrupt-ending counts are summed over the probes, so they count what the probes
+contain rather than the whole file, and `truncation_max_step_db` is the largest
+step found in any probe. Check `Result.analysis_mode` — it is
 `"probe"` (or `"truncated"` when the format cannot be seeked) rather than
 `"full"`.
 
