@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `CITATION.cff` (#10). 10.5281/zenodo.23753201 resolves to the latest
   archived release; 0.5.1 is 10.5281/zenodo.23753202.
 
+### Fixed
+
+- In probe mode, `truncation_clicks` and `abrupt_endings` are now summed over
+  the probes and `truncation_max_step_db` is the largest step in any probe.
+  All three were the median across probes, so a long file whose cut-off events
+  fell in fewer than half the probes reported zero, and with six probes a
+  count could come out as 0.5. Files analysed in full are unchanged.
+
 ## [0.5.1] - 2026-10-29
 
 This is the first release archived on Zenodo, which mints a DOI for each

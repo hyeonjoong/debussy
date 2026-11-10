@@ -1094,7 +1094,12 @@ def _aggregate_probes(results: list, file: str, duration_s: float, fs: int,
     """Pool per-probe Results: the expensive psychoacoustic / spectral metrics
     are the median across probes; level metrics are overridden with the exact
     whole-file streamed values; onset count is summed; coverage is pooled but
-    NEVER used to certify "clean" (see tier1_items)."""
+    NEVER used to certify "clean" (see tier1_items).
+
+    Truncation clicks and abrupt endings are counts of defects, so they are
+    summed like the onset count, and the largest step is the largest across
+    probes. A median would report a file as clean whenever the defects fall in
+    fewer than half the probes, and could land between two counts."""
     from statistics import median
 
     def med(field):
@@ -1104,6 +1109,14 @@ def _aggregate_probes(results: list, file: str, duration_s: float, fs: int,
     def avg(field):
         vals = [getattr(r, field) for r in results if getattr(r, field) is not None]
         return round(float(sum(vals) / len(vals)), 1) if vals else None
+
+    def total(field):
+        vals = [getattr(r, field) for r in results if getattr(r, field) is not None]
+        return int(sum(vals)) if vals else None
+
+    def largest(field):
+        vals = [getattr(r, field) for r in results if getattr(r, field) is not None]
+        return max(vals) if vals else None
 
     return Result(
         file=file,
@@ -1120,10 +1133,10 @@ def _aggregate_probes(results: list, file: str, duration_s: float, fs: int,
         beat_agreement=med("beat_agreement"),
         onset_flux=med("onset_flux"),
         modulation_peak_prominence_db=med("modulation_peak_prominence_db"),
-        truncation_clicks=med("truncation_clicks"),
-        abrupt_endings=med("abrupt_endings"),
+        truncation_clicks=total("truncation_clicks"),
+        abrupt_endings=total("abrupt_endings"),
         event_rate_per_min=med("event_rate_per_min"),
-        truncation_max_step_db=med("truncation_max_step_db"),
+        truncation_max_step_db=largest("truncation_max_step_db"),
         ioi_median_s=med("ioi_median_s"),
         ioi_cv=med("ioi_cv"),
         npvi=med("npvi"),
