@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `CITATION.cff` (#10). 10.5281/zenodo.23753201 resolves to the latest
   archived release; 0.5.1 is 10.5281/zenodo.23753202.
 
+### Fixed
+
+- A file with no audio samples now raises `ValueError` naming the file and
+  saying it is empty. It used to fail inside scipy's A-weighting filter with
+  "cannot reshape array of size 0 into shape (0)", which the CLI printed as
+  the only explanation.
+
 ## [0.5.1] - 2026-10-29
 
 This is the first release archived on Zenodo, which mints a DOI for each

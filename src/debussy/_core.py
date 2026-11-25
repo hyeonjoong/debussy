@@ -1157,6 +1157,11 @@ def analyse(path: str, lyrics: str = "unknown", delivery: str = "unknown",
         y, fs2 = sf.read(path, always_2d=False)
         if y.ndim > 1:
             y = np.mean(y, axis=1)
+        if len(y) == 0:
+            # Otherwise scipy's A-weighting filter fails with a reshape error
+            # that does not mention the file.
+            raise ValueError(f"{os.path.basename(path)}: file contains no "
+                             f"audio samples, nothing to analyse")
         y = y.astype(np.float64)
         return _result_from_signal(y, fs2, os.path.basename(path),
                                    round(len(y) / fs2, 3),

@@ -85,3 +85,30 @@ def test_one_window_clip_analyses_without_crashing(tmp_path, sr):
     r = analyze_audio(str(p))
     assert isinstance(r, Result)
     assert r.dynamic_range_db == 0.0
+
+
+# --- Files with no samples ----------------------------------------------------
+# A zero-length file reached the A-weighting filter with an empty array, and
+# analyze_audio raised scipy's "cannot reshape array of size 0 into shape (0)",
+# which says nothing about the file. There is nothing to measure, so the error
+# must name the file and say it is empty, and the CLI must skip it and carry on.
+
+@pytest.mark.parametrize("channels", [1, 2])
+def test_empty_file_raises_a_clear_error(tmp_path, channels):
+    p = tmp_path / "empty.wav"
+    sf.write(p, np.zeros((0, channels)), SR, subtype="PCM_16")
+    with pytest.raises(ValueError, match=r"empty\.wav.*no audio samples"):
+        analyze_audio(str(p))
+
+
+def test_cli_skips_an_empty_file_and_analyses_the_rest(tmp_path, short_wav,
+                                                       monkeypatch, capsys):
+    from debussy._core import main
+
+    empty = tmp_path / "empty.wav"
+    sf.write(empty, np.zeros(0), SR, subtype="PCM_16")
+    monkeypatch.setattr("sys.argv", ["debussy", str(empty), short_wav(1.0)])
+    assert main() == 0
+    err = capsys.readouterr().err
+    assert "no audio samples" in err
+    assert "reshape" not in err
